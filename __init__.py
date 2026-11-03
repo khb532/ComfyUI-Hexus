@@ -1,19 +1,19 @@
-from .Hexus import HexusTest, LatentRatio, LoraModule, PromptEncode
+from .Hexus import HexTest, HexLatent, HexLoraStack, HexPrompt
 from . import preview
 
 
 NODE_CLASS_MAPPINGS = {
-    "HexusTest": HexusTest,
-    "LatentRatio": LatentRatio,
-    "LoraModule": LoraModule,
-    "PromptEncode": PromptEncode,
+    "HexTest": HexTest,
+    "HexLatent": HexLatent,
+    "HexLoraStack": HexLoraStack,
+    "HexPrompt": HexPrompt,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "HexusTest": "HexusTest",
-    "LatentRatio": "Latent Ratio",
-    "LoraModule": "Lora Module",
-    "PromptEncode": "Prompt Encode",
+    "HexTest": "Hex Test",
+    "HexLatent": "Hex Latent",
+    "HexLoraStack": "Hex LoraStack",
+    "HexPrompt": "Hex Prompt",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

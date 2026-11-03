@@ -205,9 +205,9 @@ function setupPromptBlocks(node) {
 }
 
 app.registerExtension({
-    name: "Hexus.PromptEncode",
+    name: "Hexus.HexPrompt",
     beforeRegisterNodeDef(nodeType, nodeData) {
-        if (nodeData.name !== "PromptEncode") return;
+        if (nodeData.name !== "HexPrompt") return;
         const onNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             onNodeCreated?.apply(this, arguments);

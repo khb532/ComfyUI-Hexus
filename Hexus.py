@@ -7,7 +7,7 @@ import comfy.model_management
 from nodes import CLIPTextEncode, ConditioningConcat, LoraLoader, MAX_RESOLUTION
 
 
-class HexusTest:
+class HexTest:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -25,7 +25,7 @@ class HexusTest:
         return (clip,)
 
 
-class PromptEncode:
+class HexPrompt:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -50,7 +50,7 @@ class PromptEncode:
 
         extra_blocks = json.loads(blocks)
         if not isinstance(extra_blocks, list) or not all(isinstance(block, str) for block in extra_blocks):
-            raise ValueError("Prompt Encode: blocks must be a list of text values")
+            raise ValueError("Hex Prompt: blocks must be a list of text values")
         source = ",\n".join(block for block in [text, *extra_blocks] if block.strip())
         processed_text = wildcards.process(source, seed)
         clip_text = wildcards.remove_lora_tags(processed_text)
@@ -65,7 +65,7 @@ class PromptEncode:
         }
 
 
-class LatentRatio:
+class HexLatent:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -87,7 +87,7 @@ class LatentRatio:
         return ({"samples": latent, "downscale_ratio_spacial": 8},)
 
 
-class LoraModule:
+class HexLoraStack:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -108,14 +108,14 @@ class LoraModule:
         try:
             rows = json.loads(loras)
         except (TypeError, ValueError) as error:
-            raise ValueError("Lora Module: invalid LoRA row data") from error
+            raise ValueError("Hex LoraStack: invalid LoRA row data") from error
         if not isinstance(rows, list):
-            raise ValueError("Lora Module: LoRA rows must be a list")
+            raise ValueError("Hex LoraStack: LoRA rows must be a list")
 
         stack = []
         for index, row in enumerate(rows, 1):
             if not isinstance(row, dict):
-                raise ValueError(f"Lora Module: row {index} is invalid")
+                raise ValueError(f"Hex LoraStack: row {index} is invalid")
             if row.get("enabled", True) is False:
                 continue
             name = row.get("name")
@@ -125,9 +125,9 @@ class LoraModule:
                 model_strength = float(row.get("model_strength", 1.0))
                 clip_strength = float(row.get("clip_strength", 1.0))
             except (TypeError, ValueError) as error:
-                raise ValueError(f"Lora Module: row {index} has an invalid strength") from error
+                raise ValueError(f"Hex LoraStack: row {index} has an invalid strength") from error
             if not math.isfinite(model_strength) or not math.isfinite(clip_strength):
-                raise ValueError(f"Lora Module: row {index} has an invalid strength")
+                raise ValueError(f"Hex LoraStack: row {index} has an invalid strength")
             if model_strength == 0 and clip_strength == 0:
                 continue
             folder_paths.get_full_path_or_raise("loras", name)

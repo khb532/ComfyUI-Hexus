@@ -69,9 +69,9 @@ function openPresetDropdown(node) {
 }
 
 app.registerExtension({
-    name: "Hexus.LatentRatioPresets",
+    name: "Hexus.HexLatentPresets",
     beforeRegisterNodeDef(nodeType, nodeData) {
-        if (nodeData.name !== "LatentRatio") return;
+        if (nodeData.name !== "HexLatent") return;
         const original = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             original?.apply(this, arguments);

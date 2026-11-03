@@ -227,7 +227,7 @@ function hideWidget(widget) {
     widget.inputEl?.style && (widget.inputEl.style.display = "none");
 }
 
-function setupLoraModule(node, names) {
+function setupHexLoraStack(node, names) {
     const dataWidget = node.widgets?.find((widget) => widget.name === "loras");
     const nameWidget = node.widgets?.find((widget) => widget.name === "lora_name");
     if (!dataWidget || !nameWidget || !node.addDOMWidget) return;
@@ -269,6 +269,8 @@ function setupLoraModule(node, names) {
             enabled.addEventListener("change", () => { row.enabled = enabled.checked; sync(); });
             const name = control("button", { flex: "1", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
             name.type = "button";
+            name.disabled = !enabled.checked;
+            name.style.opacity = enabled.checked ? "1" : "0.4";
             name.textContent = row.name && row.name !== "None" ? row.name.replace(/[\\/]/g, "/").split("/").at(-1).replace(/\.[^.]+$/, "") : "None";
             name.addEventListener("click", () => chooseLora(name, names, row.name, (value) => {
                 row.name = value;
@@ -278,6 +280,8 @@ function setupLoraModule(node, names) {
             if (row.name && row.name !== "None") {
                 const info = control("button", { width: "20px", flexShrink: "0" });
                 info.type = "button";
+                info.disabled = !enabled.checked;
+                info.style.opacity = enabled.checked ? "1" : "0.4";
                 info.textContent = "i";
                 info.title = "LoRA info and Civitai previews";
                 info.addEventListener("click", () => showLoraInfo(row.name));
@@ -286,6 +290,8 @@ function setupLoraModule(node, names) {
 
             const second = document.createElement("div");
             Object.assign(second.style, { display: "flex", gap: "4px", marginTop: "4px", alignItems: "center" });
+            second.style.opacity = enabled.checked ? "1" : "0.4";
+            second.inert = !enabled.checked;
             const linked = row.linked ?? row.model_strength === row.clip_strength;
             const strengthInputs = {};
             const link = control("button", { padding: "2px" });
@@ -382,14 +388,14 @@ function setupLoraModule(node, names) {
 }
 
 app.registerExtension({
-    name: "Hexus.LoraModule",
+    name: "Hexus.HexLoraStack",
     beforeRegisterNodeDef(nodeType, nodeData) {
-        if (nodeData.name !== "LoraModule") return;
+        if (nodeData.name !== "HexLoraStack") return;
         const names = nodeData.input.required.lora_name[0];
         const original = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             original?.apply(this, arguments);
-            setupLoraModule(this, names);
+            setupHexLoraStack(this, names);
         };
     },
 });
