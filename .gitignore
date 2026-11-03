@@ -1,0 +1,32 @@
+# Local development
+.vscode/
+.idea/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Python and packaging
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local ComfyUI data and generated files
+/models/
+/input/
+/output/
+/temp/
+*.log
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
