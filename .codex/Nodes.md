@@ -8,4 +8,3 @@
 | `HexLoraStack` (Hex LoraStack) | LoRA 다중 적용, MODEL/CLIP 강도 | `web/HexLoraStack.js`: 행·선택 그리드·정보 UI; `HexLoraStackPreview.py`: LoRA 목록·프리뷰·Civitai API |
 | `HexLatent` (Hex Latent) | 빈 LATENT 생성 | `web/HexLatent.js`: 해상도 프리셋 |
 | `HexHighres` (Hex Highres) | IMAGE 또는 LATENT 입력 → LATENT 확대·재샘플링 → IMAGE/LATENT 출력 | `Hexus.py`: 기본 VAE/업스케일/KSampler 호출; `web/HexHighres.js`: 입력핀 상호 배타 연결 |
-| `HexTest` (Hex Test) | 개발용 CLIP 통과 | 없음 |

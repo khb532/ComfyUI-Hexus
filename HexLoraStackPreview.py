@@ -20,7 +20,7 @@ async def lora_list(request):
 async def lora_preview(request):
     name = request.query.get("name", "")
     path = lora_path(name)
-    previews = [path.with_suffix(suffix) for suffix in (".preview.png", ".preview.jpeg", ".preview.webp")]
+    previews = [path.with_suffix(suffix) for suffix in (".preview.png", ".preview.jpg", ".preview.jpeg", ".preview.webp")]
     for image_path in sorted((image for image in previews if image.is_file()), key=lambda image: image.stat().st_mtime_ns, reverse=True):
         return web.FileResponse(image_path)
     for suffix in (".png", ".jpg", ".jpeg", ".webp"):

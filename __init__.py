@@ -1,9 +1,8 @@
-from .Hexus import HexTest, HexLatent, HexLoraStack, HexPrompt, HexHighres
+from .Hexus import HexLatent, HexLoraStack, HexPrompt, HexHighres
 from . import HexLoraStackPreview
 
 
 NODE_CLASS_MAPPINGS = {
-    "HexTest": HexTest,
     "HexLatent": HexLatent,
     "HexLoraStack": HexLoraStack,
     "HexPrompt": HexPrompt,
@@ -11,7 +10,6 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "HexTest": "Hex Test",
     "HexLatent": "Hex Latent",
     "HexLoraStack": "Hex LoraStack",
     "HexPrompt": "Hex Prompt",

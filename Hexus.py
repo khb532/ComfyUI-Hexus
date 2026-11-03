@@ -7,24 +7,6 @@ import comfy.model_management
 from nodes import CLIPTextEncode, ConditioningConcat, KSampler, LatentUpscaleBy, LoraLoader, MAX_RESOLUTION, VAEDecode, VAEEncode
 
 
-class HexTest:
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "clip": ("CLIP",),
-                "text": ("STRING", {"multiline": True, "default": ""}),
-            }
-        }
-
-    RETURN_TYPES = ("CLIP",)
-    FUNCTION = "pass_through"
-    CATEGORY = "Hexus"
-
-    def pass_through(self, clip, text):
-        return (clip,)
-
-
 class HexPrompt:
     @classmethod
     def INPUT_TYPES(cls):
