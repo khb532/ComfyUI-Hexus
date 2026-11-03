@@ -36,6 +36,7 @@ class HexPrompt:
             },
             "optional": {
                 "blocks": ("STRING", {"multiline": True, "default": "[]", "dynamicPrompts": False}),
+                "block_enabled": ("STRING", {"default": "[]", "dynamicPrompts": False}),
                 "Select to add Wildcard": (["Select the Wildcard to add to the text"],),
             },
         }
@@ -45,13 +46,19 @@ class HexPrompt:
     FUNCTION = "encode"
     CATEGORY = "Hexus"
 
-    def encode(self, clip, text, seed, blocks="[]", **kwargs):
+    def encode(self, clip, text, seed, blocks="[]", block_enabled="[]", **kwargs):
         from impact import wildcards
 
         extra_blocks = json.loads(blocks)
         if not isinstance(extra_blocks, list) or not all(isinstance(block, str) for block in extra_blocks):
             raise ValueError("Hex Prompt: blocks must be a list of text values")
-        source = ",\n".join(block for block in [text, *extra_blocks] if block.strip())
+        enabled = json.loads(block_enabled)
+        if not isinstance(enabled, list) or not all(isinstance(value, bool) for value in enabled):
+            raise ValueError("Hex Prompt: block_enabled must be a list of booleans")
+        source = ",\n".join(
+            block for index, block in enumerate([text, *extra_blocks])
+            if (index >= len(enabled) or enabled[index]) and block.strip()
+        )
         processed_text = wildcards.process(source, seed)
         clip_text = wildcards.remove_lora_tags(processed_text)
         parts = [part.strip() for part in clip_text.split("BREAK") if part.strip()] or [""]
