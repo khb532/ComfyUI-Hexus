@@ -154,15 +154,24 @@ async function showLoraInfo(name) {
         width: "min(680px, 90vw)", maxHeight: "80vh", overflowY: "auto", padding: "16px",
         background: "#292929", color: "#eee", border: "1px solid #666", borderRadius: "8px",
     });
+    const header = document.createElement("div");
+    Object.assign(header.style, { display: "flex", alignItems: "center", justifyContent: "space-between" });
     const heading = document.createElement("h3");
     heading.textContent = name.replace(/[\\/]/g, "/").split("/").at(-1);
+    heading.style.margin = "0";
     const close = document.createElement("button");
     close.type = "button";
-    close.textContent = "Close";
+    close.textContent = "×";
+    close.setAttribute("aria-label", "Close");
+    Object.assign(close.style, {
+        width: "36px", height: "36px", fontSize: "26px", lineHeight: "1",
+        cursor: "pointer", flexShrink: "0",
+    });
     close.addEventListener("click", () => overlay.remove());
     const status = document.createElement("p");
     status.textContent = "Fetching LoRA information from Civitai...";
-    dialog.append(heading, close, status);
+    header.append(heading, close);
+    dialog.append(header, status);
     overlay.append(dialog);
     overlay.addEventListener("click", (event) => { if (event.target === overlay) overlay.remove(); });
     document.body.append(overlay);
@@ -186,6 +195,7 @@ async function showLoraInfo(name) {
         });
         for (const url of info.images || []) {
             const card = document.createElement("div");
+            Object.assign(card.style, { display: "flex", flexDirection: "column", alignItems: "center" });
             const image = document.createElement("img");
             image.src = url;
             image.loading = "lazy";
@@ -193,6 +203,7 @@ async function showLoraInfo(name) {
             const save = document.createElement("button");
             save.type = "button";
             save.textContent = "Save as preview";
+            save.style.marginTop = "4px";
             save.addEventListener("click", async () => {
                 save.disabled = true;
                 save.textContent = "Saving...";
