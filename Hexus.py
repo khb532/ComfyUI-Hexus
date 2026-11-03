@@ -4,7 +4,7 @@ import math
 import folder_paths
 import torch
 import comfy.model_management
-from nodes import CLIPTextEncode, ConditioningConcat, LoraLoader, MAX_RESOLUTION
+from nodes import CLIPTextEncode, ConditioningConcat, KSampler, LatentUpscaleBy, LoraLoader, MAX_RESOLUTION, VAEDecode, VAEEncode
 
 
 class HexTest:
@@ -92,6 +92,49 @@ class HexLatent:
     def generate(self, width, height, batch_size=1):
         latent = torch.zeros([batch_size, 4, height // 8, width // 8], device=comfy.model_management.intermediate_device(), dtype=comfy.model_management.intermediate_dtype())
         return ({"samples": latent, "downscale_ratio_spacial": 8},)
+
+
+class HexHighres:
+    @classmethod
+    def INPUT_TYPES(cls):
+        sampler = KSampler.INPUT_TYPES()["required"]
+        upscale = LatentUpscaleBy.INPUT_TYPES()["required"]
+        return {
+            "required": {
+                "model": sampler["model"],
+                "positive": sampler["positive"],
+                "negative": sampler["negative"],
+                "vae": ("VAE",),
+                "upscale_method": upscale["upscale_method"],
+                "scale_by": upscale["scale_by"],
+                "seed": sampler["seed"],
+                "steps": sampler["steps"],
+                "cfg": sampler["cfg"],
+                "sampler_name": sampler["sampler_name"],
+                "scheduler": sampler["scheduler"],
+                "denoise": sampler["denoise"],
+            },
+            "optional": {
+                "image": ("IMAGE",),
+                "latent": ("LATENT",),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", "LATENT")
+    RETURN_NAMES = ("image", "latent")
+    FUNCTION = "generate"
+    CATEGORY = "Hexus"
+
+    def generate(self, model, positive, negative, vae, upscale_method, scale_by,
+                 seed, steps, cfg, sampler_name, scheduler, denoise, image=None, latent=None):
+        if (image is None) == (latent is None):
+            raise ValueError("Hex Highres: connect exactly one of image or latent")
+        source = VAEEncode().encode(vae, image)[0] if image is not None else latent
+        enlarged = LatentUpscaleBy().upscale(source, upscale_method, scale_by)[0]
+        sampled = KSampler().sample(model, seed, steps, cfg, sampler_name, scheduler,
+                                    positive, negative, enlarged, denoise)[0]
+        result = VAEDecode().decode(vae, sampled)[0]
+        return (result, sampled)
 
 
 class HexLoraStack:

@@ -10,6 +10,7 @@ ComfyUI-Hexus/
 ├── HexLoraStackPreview.py  LoRA 목록·프리뷰·Civitai HTTP 경로
 ├── web/
 │   ├── HexLatent.js      HexLatent 해상도 프리셋 UI
+│   ├── HexHighres.js     HexHighres IMAGE/LATENT 입력핀 연결 제어
 │   ├── HexLoraStack.js   HexLoraStack 행·선택·정보 UI
 │   └── HexPrompt.js      HexPrompt 블록·자동완성·시드 UI
 └── .codex/
