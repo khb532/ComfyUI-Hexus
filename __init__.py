@@ -1,5 +1,5 @@
 from .Hexus import HexTest, HexLatent, HexLoraStack, HexPrompt
-from . import preview
+from . import HexLoraStackPreview
 
 
 NODE_CLASS_MAPPINGS = {

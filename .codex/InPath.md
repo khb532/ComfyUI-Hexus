@@ -7,11 +7,11 @@ ComfyUI-Hexus/
 ├── AGENTS.md             작업 지침
 ├── __init__.py           노드 등록·표시 이름, 웹 확장 등록
 ├── Hexus.py              노드 클래스와 실행 코드
-├── preview.py            LoRA 목록·프리뷰·Civitai HTTP 경로
+├── HexLoraStackPreview.py  LoRA 목록·프리뷰·Civitai HTTP 경로
 ├── web/
-│   ├── latent_ratio.js   HexLatent 해상도 프리셋 UI
-│   ├── lora_module.js    HexLoraStack 행·선택·정보 UI
-│   └── prompt_encode.js  HexPrompt 블록·자동완성·시드 UI
+│   ├── HexLatent.js      HexLatent 해상도 프리셋 UI
+│   ├── HexLoraStack.js   HexLoraStack 행·선택·정보 UI
+│   └── HexPrompt.js      HexPrompt 블록·자동완성·시드 UI
 └── .codex/
     ├── InPath.md         이 파일
     ├── OutPath.md        외부 커스텀 노드 패키지 경로
