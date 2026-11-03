@@ -4,10 +4,10 @@ import math
 import folder_paths
 import torch
 import comfy.model_management
-from nodes import CLIPTextEncode, ConditioningConcat, LoraLoader, MAX_RESOLUTION
+from nodes import CLIPTextEncode, ConditioningConcat, KSampler, LatentUpscaleBy, LoraLoader, MAX_RESOLUTION, VAEDecode, VAEEncode
 
 
-class HexusTest:
+class HexTest:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -25,7 +25,7 @@ class HexusTest:
         return (clip,)
 
 
-class PromptEncode:
+class HexPrompt:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -36,6 +36,7 @@ class PromptEncode:
             },
             "optional": {
                 "blocks": ("STRING", {"multiline": True, "default": "[]", "dynamicPrompts": False}),
+                "block_enabled": ("STRING", {"default": "[]", "dynamicPrompts": False}),
                 "Select to add Wildcard": (["Select the Wildcard to add to the text"],),
             },
         }
@@ -45,13 +46,19 @@ class PromptEncode:
     FUNCTION = "encode"
     CATEGORY = "Hexus"
 
-    def encode(self, clip, text, seed, blocks="[]", **kwargs):
+    def encode(self, clip, text, seed, blocks="[]", block_enabled="[]", **kwargs):
         from impact import wildcards
 
         extra_blocks = json.loads(blocks)
         if not isinstance(extra_blocks, list) or not all(isinstance(block, str) for block in extra_blocks):
-            raise ValueError("Prompt Encode: blocks must be a list of text values")
-        source = ",\n".join(block for block in [text, *extra_blocks] if block.strip())
+            raise ValueError("Hex Prompt: blocks must be a list of text values")
+        enabled = json.loads(block_enabled)
+        if not isinstance(enabled, list) or not all(isinstance(value, bool) for value in enabled):
+            raise ValueError("Hex Prompt: block_enabled must be a list of booleans")
+        source = ",\n".join(
+            block for index, block in enumerate([text, *extra_blocks])
+            if (index >= len(enabled) or enabled[index]) and block.strip()
+        )
         processed_text = wildcards.process(source, seed)
         clip_text = wildcards.remove_lora_tags(processed_text)
         parts = [part.strip() for part in clip_text.split("BREAK") if part.strip()] or [""]
@@ -65,7 +72,7 @@ class PromptEncode:
         }
 
 
-class LatentRatio:
+class HexLatent:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -87,7 +94,50 @@ class LatentRatio:
         return ({"samples": latent, "downscale_ratio_spacial": 8},)
 
 
-class LoraModule:
+class HexHighres:
+    @classmethod
+    def INPUT_TYPES(cls):
+        sampler = KSampler.INPUT_TYPES()["required"]
+        upscale = LatentUpscaleBy.INPUT_TYPES()["required"]
+        return {
+            "required": {
+                "model": sampler["model"],
+                "positive": sampler["positive"],
+                "negative": sampler["negative"],
+                "vae": ("VAE",),
+                "upscale_method": upscale["upscale_method"],
+                "scale_by": upscale["scale_by"],
+                "seed": sampler["seed"],
+                "steps": sampler["steps"],
+                "cfg": sampler["cfg"],
+                "sampler_name": sampler["sampler_name"],
+                "scheduler": sampler["scheduler"],
+                "denoise": sampler["denoise"],
+            },
+            "optional": {
+                "image": ("IMAGE",),
+                "latent": ("LATENT",),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", "LATENT")
+    RETURN_NAMES = ("image", "latent")
+    FUNCTION = "generate"
+    CATEGORY = "Hexus"
+
+    def generate(self, model, positive, negative, vae, upscale_method, scale_by,
+                 seed, steps, cfg, sampler_name, scheduler, denoise, image=None, latent=None):
+        if (image is None) == (latent is None):
+            raise ValueError("Hex Highres: connect exactly one of image or latent")
+        source = VAEEncode().encode(vae, image)[0] if image is not None else latent
+        enlarged = LatentUpscaleBy().upscale(source, upscale_method, scale_by)[0]
+        sampled = KSampler().sample(model, seed, steps, cfg, sampler_name, scheduler,
+                                    positive, negative, enlarged, denoise)[0]
+        result = VAEDecode().decode(vae, sampled)[0]
+        return (result, sampled)
+
+
+class HexLoraStack:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -108,14 +158,14 @@ class LoraModule:
         try:
             rows = json.loads(loras)
         except (TypeError, ValueError) as error:
-            raise ValueError("Lora Module: invalid LoRA row data") from error
+            raise ValueError("Hex LoraStack: invalid LoRA row data") from error
         if not isinstance(rows, list):
-            raise ValueError("Lora Module: LoRA rows must be a list")
+            raise ValueError("Hex LoraStack: LoRA rows must be a list")
 
         stack = []
         for index, row in enumerate(rows, 1):
             if not isinstance(row, dict):
-                raise ValueError(f"Lora Module: row {index} is invalid")
+                raise ValueError(f"Hex LoraStack: row {index} is invalid")
             if row.get("enabled", True) is False:
                 continue
             name = row.get("name")
@@ -125,9 +175,9 @@ class LoraModule:
                 model_strength = float(row.get("model_strength", 1.0))
                 clip_strength = float(row.get("clip_strength", 1.0))
             except (TypeError, ValueError) as error:
-                raise ValueError(f"Lora Module: row {index} has an invalid strength") from error
+                raise ValueError(f"Hex LoraStack: row {index} has an invalid strength") from error
             if not math.isfinite(model_strength) or not math.isfinite(clip_strength):
-                raise ValueError(f"Lora Module: row {index} has an invalid strength")
+                raise ValueError(f"Hex LoraStack: row {index} has an invalid strength")
             if model_strength == 0 and clip_strength == 0:
                 continue
             folder_paths.get_full_path_or_raise("loras", name)

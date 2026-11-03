@@ -1,6 +1,7 @@
 import { app } from "../../../scripts/app.js";
 
-const ROW_HEIGHT = 58;
+const ROW_HEIGHT = 78;
+const MIN_WIDTH = 400;
 const formatStrength = (value) => Number.isInteger(Number(value)) ? Number(value).toFixed(1) : String(Number(value));
 const LAST_FOLDER_KEY = "hexus.loraModule.lastFolder";
 let lastFolder = "";
@@ -153,15 +154,24 @@ async function showLoraInfo(name) {
         width: "min(680px, 90vw)", maxHeight: "80vh", overflowY: "auto", padding: "16px",
         background: "#292929", color: "#eee", border: "1px solid #666", borderRadius: "8px",
     });
+    const header = document.createElement("div");
+    Object.assign(header.style, { display: "flex", alignItems: "center", justifyContent: "space-between" });
     const heading = document.createElement("h3");
     heading.textContent = name.replace(/[\\/]/g, "/").split("/").at(-1);
+    heading.style.margin = "0";
     const close = document.createElement("button");
     close.type = "button";
-    close.textContent = "Close";
+    close.textContent = "×";
+    close.setAttribute("aria-label", "Close");
+    Object.assign(close.style, {
+        width: "36px", height: "36px", fontSize: "26px", lineHeight: "1",
+        cursor: "pointer", flexShrink: "0",
+    });
     close.addEventListener("click", () => overlay.remove());
     const status = document.createElement("p");
     status.textContent = "Fetching LoRA information from Civitai...";
-    dialog.append(heading, close, status);
+    header.append(heading, close);
+    dialog.append(header, status);
     overlay.append(dialog);
     overlay.addEventListener("click", (event) => { if (event.target === overlay) overlay.remove(); });
     document.body.append(overlay);
@@ -185,6 +195,7 @@ async function showLoraInfo(name) {
         });
         for (const url of info.images || []) {
             const card = document.createElement("div");
+            Object.assign(card.style, { display: "flex", flexDirection: "column", alignItems: "center" });
             const image = document.createElement("img");
             image.src = url;
             image.loading = "lazy";
@@ -192,6 +203,7 @@ async function showLoraInfo(name) {
             const save = document.createElement("button");
             save.type = "button";
             save.textContent = "Save as preview";
+            save.style.marginTop = "4px";
             save.addEventListener("click", async () => {
                 save.disabled = true;
                 save.textContent = "Saving...";
@@ -227,7 +239,7 @@ function hideWidget(widget) {
     widget.inputEl?.style && (widget.inputEl.style.display = "none");
 }
 
-function setupLoraModule(node, names) {
+function setupHexLoraStack(node, names) {
     const dataWidget = node.widgets?.find((widget) => widget.name === "loras");
     const nameWidget = node.widgets?.find((widget) => widget.name === "lora_name");
     if (!dataWidget || !nameWidget || !node.addDOMWidget) return;
@@ -235,7 +247,7 @@ function setupLoraModule(node, names) {
     hideWidget(dataWidget);
     hideWidget(nameWidget);
     const panel = document.createElement("div");
-    Object.assign(panel.style, { padding: "6px", color: "#ddd", fontSize: "12px", boxSizing: "border-box" });
+    Object.assign(panel.style, { padding: "6px", color: "#ddd", fontSize: "13px", boxSizing: "border-box" });
     for (const eventName of ["pointerdown", "pointermove", "pointerup", "mousedown", "mouseup", "click", "dblclick", "wheel"]) {
         panel.addEventListener(eventName, (event) => event.stopPropagation());
     }
@@ -253,31 +265,41 @@ function setupLoraModule(node, names) {
     };
     const control = (tag, style = {}) => {
         const element = document.createElement(tag);
-        Object.assign(element.style, { color: "#eee", background: "#303030", border: "1px solid #666", minWidth: "0", ...style });
+        Object.assign(element.style, { color: "#eee", background: "#303030", border: "1px solid #666", boxSizing: "border-box", minWidth: "0", ...style });
         return element;
     };
     const render = () => {
         panel.replaceChildren();
         rows.forEach((row, index) => {
             const wrapper = document.createElement("div");
-            Object.assign(wrapper.style, { borderBottom: "1px solid #555", padding: "4px 0" });
+            Object.assign(wrapper.style, { borderBottom: "1px solid #555", padding: "7px 0" });
             const first = document.createElement("div");
-            Object.assign(first.style, { display: "flex", gap: "4px", alignItems: "center" });
-            const enabled = control("input");
-            enabled.type = "checkbox";
-            enabled.checked = row.enabled !== false;
-            enabled.addEventListener("change", () => { row.enabled = enabled.checked; sync(); });
-            const name = control("button", { flex: "1", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+            Object.assign(first.style, { display: "flex", gap: "7px", alignItems: "center" });
+            const isEnabled = row.enabled !== false;
+            const toggle = control("button", {
+                display: "grid", placeItems: "center", width: "34px", height: "24px", padding: "0",
+                boxSizing: "border-box", flexShrink: "0", font: "bold 11px sans-serif", lineHeight: "1", cursor: "pointer",
+                border: isEnabled ? "1px solid #609cf0" : "1px solid #68707b",
+                background: isEnabled ? "#315da4" : "#30343c", color: isEnabled ? "#fff" : "#a9b0ba",
+            });
+            toggle.type = "button";
+            toggle.textContent = isEnabled ? "ON" : "OFF";
+            toggle.title = isEnabled ? "Disable LoRA" : "Enable LoRA";
+            toggle.setAttribute("aria-pressed", String(isEnabled));
+            toggle.addEventListener("click", () => { row.enabled = !isEnabled; sync(); });
+            const name = control("button", { flex: "1", height: "26px", padding: "3px 8px", fontSize: "13px", lineHeight: "18px", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" });
             name.type = "button";
+            name.style.opacity = isEnabled ? "1" : "0.75";
             name.textContent = row.name && row.name !== "None" ? row.name.replace(/[\\/]/g, "/").split("/").at(-1).replace(/\.[^.]+$/, "") : "None";
             name.addEventListener("click", () => chooseLora(name, names, row.name, (value) => {
                 row.name = value;
                 sync();
             }));
-            first.append(enabled, name);
+            first.append(toggle, name);
             if (row.name && row.name !== "None") {
-                const info = control("button", { width: "20px", flexShrink: "0" });
+                const info = control("button", { display: "grid", placeItems: "center", width: "26px", height: "26px", padding: "0", flexShrink: "0", fontSize: "14px", fontWeight: "bold" });
                 info.type = "button";
+                info.style.opacity = isEnabled ? "1" : "0.75";
                 info.textContent = "i";
                 info.title = "LoRA info and Civitai previews";
                 info.addEventListener("click", () => showLoraInfo(row.name));
@@ -285,15 +307,15 @@ function setupLoraModule(node, names) {
             }
 
             const second = document.createElement("div");
-            Object.assign(second.style, { display: "flex", gap: "4px", marginTop: "4px", alignItems: "center" });
+            Object.assign(second.style, { display: "flex", gap: "7px", marginTop: "7px", alignItems: "center", justifyContent: "center", whiteSpace: "nowrap", opacity: isEnabled ? "1" : "0.75" });
             const linked = row.linked ?? row.model_strength === row.clip_strength;
             const strengthInputs = {};
-            const link = control("button", { padding: "2px" });
+            const link = control("button", { display: "grid", placeItems: "center", width: "28px", height: "26px", padding: "0", flexShrink: "0", fontSize: "15px" });
             link.type = "button";
             link.textContent = linked ? "🔗" : "⛓️‍💥";
             link.title = linked ? "MODEL and CLIP strengths linked" : "MODEL and CLIP strengths separate";
             link.setAttribute("aria-pressed", String(linked));
-            link.style.opacity = linked ? "1" : "0.4";
+            link.style.opacity = linked ? "1" : "0.75";
             link.addEventListener("click", () => {
                 row.linked = !linked;
                 if (row.linked) row.clip_strength = row.model_strength;
@@ -302,7 +324,10 @@ function setupLoraModule(node, names) {
             const addStrength = (label, key) => {
                 const text = document.createElement("span");
                 text.textContent = label;
-                const value = control("input", { width: "52px", cursor: "ew-resize" });
+                Object.assign(text.style, { display: "inline-flex", alignItems: "center", justifyContent: "center", height: "26px", flexShrink: "0" });
+                const group = document.createElement("div");
+                Object.assign(group.style, { display: "flex", gap: "3px", flexShrink: "0" });
+                const value = control("input", { width: "50px", height: "26px", boxSizing: "border-box", padding: "0 2px", fontSize: "13px", textAlign: "center", cursor: "ew-resize" });
                 value.type = "text";
                 value.inputMode = "decimal";
                 value.value = formatStrength(row[key] ?? 1);
@@ -337,12 +362,21 @@ function setupLoraModule(node, names) {
                     drag = null;
                 });
                 value.addEventListener("pointercancel", () => { drag = null; });
-                second.append(text, value);
+                const arrow = (symbol, delta) => {
+                    const button = control("button", { display: "grid", placeItems: "center", width: "20px", height: "26px", padding: "0", flexShrink: "0", fontSize: "11px", lineHeight: "1" });
+                    button.type = "button";
+                    button.textContent = symbol;
+                    button.title = `${delta > 0 ? "Increase" : "Decrease"} ${label} by 0.05`;
+                    button.addEventListener("click", () => applyValue(Number((Number(row[key] ?? 1) + delta).toFixed(10))));
+                    return button;
+                };
+                group.append(arrow("◀", -0.05), value, arrow("▶", 0.05));
+                second.append(text, group);
             };
             addStrength("MODEL", "model_strength");
             second.append(link);
             addStrength("CLIP", "clip_strength");
-            const remove = control("button");
+            const remove = control("button", { display: "grid", placeItems: "center", width: "26px", height: "26px", padding: "0", flexShrink: "0", fontSize: "18px" });
             remove.type = "button";
             remove.textContent = "×";
             remove.title = "Remove LoRA";
@@ -351,7 +385,7 @@ function setupLoraModule(node, names) {
             wrapper.append(first, second);
             panel.append(wrapper);
         });
-        const add = control("button", { width: "100%", marginTop: "5px", padding: "4px" });
+        const add = control("button", { width: "100%", marginTop: "8px", padding: "6px", fontSize: "13px", textAlign: "center" });
         add.type = "button";
         add.textContent = "+ Add LoRA";
         add.addEventListener("click", () => {
@@ -366,7 +400,7 @@ function setupLoraModule(node, names) {
     node.addDOMWidget("lora_rows", "HexusLoraRows", panel, {
         serialize: false,
         hideOnZoom: false,
-        getMinHeight: () => 38 + rows.length * ROW_HEIGHT,
+        getMinHeight: () => 44 + rows.length * ROW_HEIGHT,
     });
     const originalConfigure = node.onConfigure;
     node.onConfigure = function () {
@@ -377,19 +411,27 @@ function setupLoraModule(node, names) {
         } catch { rows = []; }
         render();
     };
+    const originalResize = node.onResize;
+    node.onResize = function (size) {
+        originalResize?.apply(this, arguments);
+        if (size[0] < MIN_WIDTH) {
+            size[0] = MIN_WIDTH;
+            this.size[0] = MIN_WIDTH;
+        }
+    };
     render();
-    node.setSize?.([Math.max(node.size[0], 360), Math.max(node.size[1], node.computeSize()[1])]);
+    node.setSize?.([MIN_WIDTH, Math.max(node.size[1], node.computeSize()[1])]);
 }
 
 app.registerExtension({
-    name: "Hexus.LoraModule",
+    name: "Hexus.HexLoraStack",
     beforeRegisterNodeDef(nodeType, nodeData) {
-        if (nodeData.name !== "LoraModule") return;
+        if (nodeData.name !== "HexLoraStack") return;
         const names = nodeData.input.required.lora_name[0];
         const original = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             original?.apply(this, arguments);
-            setupLoraModule(this, names);
+            setupHexLoraStack(this, names);
         };
     },
 });
