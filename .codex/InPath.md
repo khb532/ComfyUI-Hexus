@@ -5,6 +5,7 @@
 ```text
 ComfyUI-Hexus/
 ├── AGENTS.md             작업 지침
+├── README.md             프로젝트 소개·의존성·라이선스
 ├── __init__.py           노드 등록·표시 이름, 웹 확장 등록
 ├── Hexus.py              노드 클래스와 실행 코드
 ├── HexLoraStackPreview.py  LoRA 목록·프리뷰·Civitai HTTP 경로
