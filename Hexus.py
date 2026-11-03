@@ -47,8 +47,6 @@ class HexPrompt:
     CATEGORY = "Hexus"
 
     def encode(self, clip, text, seed, blocks="[]", block_enabled="[]", **kwargs):
-        from impact import wildcards
-
         extra_blocks = json.loads(blocks)
         if not isinstance(extra_blocks, list) or not all(isinstance(block, str) for block in extra_blocks):
             raise ValueError("Hex Prompt: blocks must be a list of text values")
@@ -59,9 +57,15 @@ class HexPrompt:
             block for index, block in enumerate([text, *extra_blocks])
             if (index >= len(enabled) or enabled[index]) and block.strip()
         )
-        processed_text = wildcards.process(source, seed)
-        clip_text = wildcards.remove_lora_tags(processed_text)
-        parts = [part.strip() for part in clip_text.split("BREAK") if part.strip()] or [""]
+        try:
+            from impact import wildcards
+            processed_text = wildcards.process(source, seed)
+            clip_text = wildcards.remove_lora_tags(processed_text)
+            parts = [part.strip() for part in clip_text.split("BREAK") if part.strip()] or [""]
+        except Exception:
+            processed_text = source
+            parts = [source]
+
         conditioning = CLIPTextEncode().encode(clip, parts[0])[0]
         for part in parts[1:]:
             next_conditioning = CLIPTextEncode().encode(clip, part)[0]
