@@ -1,5 +1,6 @@
 import json
 import math
+import secrets
 
 import folder_paths
 import torch
@@ -78,6 +79,45 @@ class HexLatent:
     def generate(self, width, height, batch_size=1):
         latent = torch.zeros([batch_size, 4, height // 8, width // 8], device=comfy.model_management.intermediate_device(), dtype=comfy.model_management.intermediate_dtype())
         return ({"samples": latent, "downscale_ratio_spacial": 8},)
+
+
+class HexParam:
+    @classmethod
+    def INPUT_TYPES(cls):
+        sampler = KSampler.INPUT_TYPES()["required"]
+        seed_options = {key: value for key, value in sampler["seed"][1].items()
+                        if key not in ("tooltip", "control_after_generate")}
+        seed_options.update({"default": -1, "min": -1})
+        cfg_options = {key: value for key, value in sampler["cfg"][1].items() if key != "tooltip"}
+        cfg_options["step"] = 0.5
+        denoise_options = {key: value for key, value in sampler["denoise"][1].items() if key != "tooltip"}
+        denoise_options.update({"default": 1, "step": 0.05, "round": 0.01})
+        return {"required": {
+            "sampler": (sampler["sampler_name"][0],),
+            "scheduler": (sampler["scheduler"][0],),
+            "steps": ("INT", {key: value for key, value in sampler["steps"][1].items() if key != "tooltip"}),
+            "cfg": ("FLOAT", cfg_options),
+            "denoise": ("FLOAT", denoise_options),
+            "seed": ("INT", seed_options),
+        }}
+
+    RETURN_TYPES = ("HEX_PARAM_CONTEXT", "INT", "INT", "FLOAT", "FLOAT",
+                    KSampler.INPUT_TYPES()["required"]["sampler_name"][0],
+                    KSampler.INPUT_TYPES()["required"]["scheduler"][0])
+    RETURN_NAMES = ("context", "STEPS", "SEED", "CFG", "DENOISE", "SAMPLER", "SCHEDULER")
+    FUNCTION = "get_params"
+    CATEGORY = "Hexus"
+
+    @classmethod
+    def IS_CHANGED(cls, seed, **kwargs):
+        return secrets.randbelow(1125899906842624) if seed == -1 else seed
+
+    def get_params(self, steps, seed, cfg, sampler, scheduler, denoise=1.0):
+        if seed == -1:
+            seed = secrets.randbelow(1125899906842624)
+        context = {"steps": steps, "seed": seed, "cfg": cfg, "sampler": sampler,
+                   "scheduler": scheduler, "denoise": denoise}
+        return (context, steps, seed, cfg, denoise, sampler, scheduler)
 
 
 class HexHighres:
