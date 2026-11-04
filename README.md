@@ -4,6 +4,39 @@ ComfyUI 기본 노드와 자주 사용하는 커스텀 노드의 기능을 가�
 
 ComfyUI-Hexus adapts features from core and commonly used custom nodes, with inputs and outputs designed to connect easily to standard ComfyUI nodes.
 
+## 구성 노드 / Included Nodes
+
+### Hex Prompt
+
+<table><tr><td><img src="assets/images/prompt.png" alt="Hex Prompt 노드 화면"></td><td><ul>
+<li>블록 추가·정렬·ON/OFF</li>
+<li>와일드카드 지원</li>
+</ul></td></tr></table>
+
+### Hex LoraStack
+
+<table><tr><td><img src="assets/images/lora.png" alt="Hex LoraStack 노드 화면"></td><td><ul>
+<li>Lora Stack</li>
+<li>LoRA 프리뷰</li>
+</ul></td></tr></table>
+
+### Hex Latent
+
+<table><tr><td><img src="assets/images/latent.png" alt="Hex Latent 노드 화면"></td><td><ul>
+<li>프리셋</li>
+</ul></td></tr></table>
+
+### Hex Highres
+
+<table><tr><td><img src="assets/images/highres.png" alt="Hex Highres 노드 화면"></td><td><ul>
+<li>KSampler 베이스 Highres 워크플로 압축형</li>
+<li>KSampler(기본크기) - Highres - SaveImage</li>
+</ul></td></tr></table>
+
+## 스크린샷 / Screenshots
+
+전체 워크플로 스크린샷 추가 위치: `assets/images/workflow.png`
+
 ## 의존성 / Dependencies
 
 | 패키지 | 사용처 | 필요 여부 |
