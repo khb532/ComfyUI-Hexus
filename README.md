@@ -33,10 +33,6 @@ ComfyUI-Hexus adapts features from core and commonly used custom nodes, with inp
 <li>KSampler(기본크기) - Highres - SaveImage</li>
 </ul></td></tr></table>
 
-## 스크린샷 / Screenshots
-
-전체 워크플로 스크린샷 추가 위치: `assets/images/workflow.png`
-
 ## 의존성 / Dependencies
 
 | 패키지 | 사용처 | 필요 여부 |
