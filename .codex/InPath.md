@@ -18,6 +18,7 @@ ComfyUI-Hexus/
 │   ├── HexParam.js       HexParam 시드 버튼·대기열 시드 처리
 │   ├── HexSampler.js     HexSampler 모드·업로드·시드·확대보기·마스크 UI
 │   ├── HexPreviewSave.js HexPreviewSave 저장·샘플러 전송 UI
+│   ├── HexNodeColors.js   Hexus 노드별 기본 팔레트 색
 │   ├── HexLoraStack.js   HexLoraStack 행·선택·정보 UI
 │   └── HexPrompt.js      HexPrompt 블록·자동완성·Last Seed Fix UI
 └── .codex/
