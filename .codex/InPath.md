@@ -15,6 +15,7 @@ ComfyUI-Hexus/
 │   ├── HexLatent.js      HexLatent 해상도 프리셋 UI
 │   ├── HexHighres.js     HexHighres IMAGE/LATENT 입력핀 연결 제어
 │   ├── HexParam.js       HexParam 시드 버튼·대기열 시드 처리
+│   ├── HexSampler.js     HexSampler 모드·업로드·시드·확대보기·마스크 UI
 │   ├── HexLoraStack.js   HexLoraStack 행·선택·정보 UI
 │   └── HexPrompt.js      HexPrompt 블록·자동완성·시드 UI
 └── .codex/

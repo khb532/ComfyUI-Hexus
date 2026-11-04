@@ -1,11 +1,12 @@
 import json
 import math
+import os
 import secrets
 
 import folder_paths
 import torch
 import comfy.model_management
-from nodes import CLIPTextEncode, ConditioningConcat, KSampler, LatentUpscaleBy, LoraLoader, MAX_RESOLUTION, VAEDecode, VAEEncode
+from nodes import CLIPTextEncode, ConditioningConcat, InpaintModelConditioning, KSampler, LatentUpscaleBy, LoadImage, LoraLoader, MAX_RESOLUTION, VAEDecode, VAEEncode
 
 
 class HexPrompt:
@@ -118,6 +119,91 @@ class HexParam:
         context = {"steps": steps, "seed": seed, "cfg": cfg, "sampler": sampler,
                    "scheduler": scheduler, "denoise": denoise}
         return (context, steps, seed, cfg, denoise, sampler, scheduler)
+
+
+class HexSampler:
+    @classmethod
+    def INPUT_TYPES(cls):
+        sampler = KSampler.INPUT_TYPES()["required"]
+        latent = HexLatent.INPUT_TYPES()["required"]
+        input_dir = folder_paths.get_input_directory()
+        images = sorted(folder_paths.filter_files_content_types(
+            [name for name in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, name))],
+            ["image"]))
+        seed_options = {key: value for key, value in sampler["seed"][1].items()
+                        if key not in ("tooltip", "control_after_generate")}
+        seed_options.update({"default": -1, "min": -1})
+        cfg_options = {key: value for key, value in sampler["cfg"][1].items() if key != "tooltip"}
+        cfg_options["step"] = 0.5
+        denoise_options = {key: value for key, value in sampler["denoise"][1].items() if key != "tooltip"}
+        denoise_options.update({"default": 1, "step": 0.05, "round": 0.01})
+        width_options = {key: value for key, value in latent["width"][1].items() if key != "tooltip"}
+        height_options = {key: value for key, value in latent["height"][1].items() if key != "tooltip"}
+        width_options["default"] = height_options["default"] = 1024
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "positive": ("CONDITIONING",),
+                "negative": ("CONDITIONING",),
+                "vae": ("VAE",),
+                "mode": (["t2i", "i2i", "Inpaint"],),
+                "sampler": (sampler["sampler_name"][0],),
+                "scheduler": (sampler["scheduler"][0],),
+                "steps": ("INT", {key: value for key, value in sampler["steps"][1].items() if key != "tooltip"}),
+                "cfg": ("FLOAT", cfg_options),
+                "denoise": ("FLOAT", denoise_options),
+                "seed": ("INT", seed_options),
+                "width": ("INT", width_options),
+                "height": ("INT", height_options),
+                "batch_size": ("INT", {key: value for key, value in latent["batch_size"][1].items() if key != "tooltip"}),
+                "image": (["", *images], {"image_upload": True}),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", "LATENT")
+    RETURN_NAMES = ("IMAGE", "LATENT")
+    FUNCTION = "sample"
+    CATEGORY = "Hexus"
+
+    @classmethod
+    def IS_CHANGED(cls, mode, seed, image="", **kwargs):
+        current_seed = secrets.randbelow(1125899906842624) if seed == -1 else seed
+        image_hash = LoadImage.IS_CHANGED(image) if mode in ("i2i", "Inpaint") and image else ""
+        return f"{current_seed}:{image_hash}"
+
+    @classmethod
+    def VALIDATE_INPUTS(cls, mode, image=""):
+        if mode not in ("t2i", "i2i", "Inpaint"):
+            return "Hex Sampler: choose t2i, i2i, or Inpaint"
+        if mode in ("i2i", "Inpaint"):
+            if not image:
+                return "Hex Sampler: select an image for i2i or Inpaint"
+            return LoadImage.VALIDATE_INPUTS(image)
+        return True
+
+    def sample(self, model, positive, negative, vae, mode, sampler, scheduler, steps,
+               cfg, denoise, seed, width, height, batch_size, image=""):
+        if seed == -1:
+            seed = secrets.randbelow(1125899906842624)
+        if mode == "t2i":
+            source = HexLatent().generate(width, height, batch_size)[0]
+        else:
+            if not image:
+                raise ValueError("Hex Sampler: select an image for i2i or Inpaint")
+            pixels, image_mask = LoadImage().load_image(image)
+            if mode == "i2i":
+                source = VAEEncode().encode(vae, pixels)[0]
+            elif mode == "Inpaint":
+                if not torch.any(image_mask > 0):
+                    raise ValueError("Hex Sampler: paint a mask on the selected image for Inpaint")
+                positive, negative, source = InpaintModelConditioning().encode(
+                    positive, negative, pixels, vae, image_mask)
+            else:
+                raise ValueError(f"Hex Sampler: unknown mode {mode}")
+
+        sampled = KSampler().sample(model, seed, steps, cfg, sampler, scheduler,
+                                    positive, negative, source, denoise)[0]
+        return (VAEDecode().decode(vae, sampled)[0], sampled)
 
 
 class HexHighres:

@@ -9,3 +9,4 @@
 | `HexLatent` (Hex Latent) | 빈 LATENT 생성 | `web/HexLatent.js`: 해상도 프리셋 |
 | `HexHighres` (Hex Highres) | IMAGE 또는 LATENT 입력 → LATENT 확대·재샘플링 → IMAGE/LATENT 출력 | `Hexus.py`: 기본 VAE/업스케일/KSampler 호출; `web/HexHighres.js`: 입력핀 상호 배타 연결 |
 | `HexParam` (Hex Param) | 샘플러·스케줄러·스텝·CFG·디노이즈·시드 위젯 → context 묶음·개별 출력, 시드 버튼 | `Hexus.py`: 파라미터·시드 실행; `web/HexParam.js`: 버튼·대기열 시드·기존 연결 처리 |
+| `HexSampler` (Hex Sampler) | t2i/i2i/Inpaint 통합 샘플러·파라미터·해상도 설정 → IMAGE/LATENT 출력 | `Hexus.py`: 모드별 샘플링 실행; `web/HexSampler.js`: 업로드·시드·해상도 UI, 이미지 확대·마스크 편집 버튼 |
