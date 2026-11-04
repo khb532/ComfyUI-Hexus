@@ -17,7 +17,7 @@ ComfyUI-Hexus/
 │   ├── HexParam.js       HexParam 시드 버튼·대기열 시드 처리
 │   ├── HexSampler.js     HexSampler 모드·업로드·시드·확대보기·마스크 UI
 │   ├── HexLoraStack.js   HexLoraStack 행·선택·정보 UI
-│   └── HexPrompt.js      HexPrompt 블록·자동완성·시드 UI
+│   └── HexPrompt.js      HexPrompt 블록·자동완성·Last Seed Fix UI
 └── .codex/
     ├── InPath.md         이 파일
     ├── OutPath.md        외부 커스텀 노드 패키지 경로

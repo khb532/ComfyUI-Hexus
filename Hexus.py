@@ -10,13 +10,17 @@ from nodes import CLIPTextEncode, ConditioningConcat, InpaintModelConditioning, 
 
 
 class HexPrompt:
+    def __init__(self):
+        self.last_wildcard_seed = None
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "clip": ("CLIP",),
                 "text": ("STRING", {"multiline": True, "default": "", "dynamicPrompts": False}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff, "control_after_generate": True}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
+                "last_seed_fix": ("BOOLEAN", {"default": False, "label_on": "On", "label_off": "Off"}),
             },
             "optional": {
                 "blocks": ("STRING", {"multiline": True, "default": "[]", "dynamicPrompts": False}),
@@ -30,7 +34,11 @@ class HexPrompt:
     FUNCTION = "encode"
     CATEGORY = "Hexus"
 
-    def encode(self, clip, text, seed, blocks="[]", block_enabled="[]", **kwargs):
+    @classmethod
+    def IS_CHANGED(cls, last_seed_fix, seed=0, **kwargs):
+        return seed if last_seed_fix else secrets.randbelow(1125899906842624)
+
+    def encode(self, clip, text, seed, last_seed_fix=False, blocks="[]", block_enabled="[]", **kwargs):
         extra_blocks = json.loads(blocks)
         if not isinstance(extra_blocks, list) or not all(isinstance(block, str) for block in extra_blocks):
             raise ValueError("Hex Prompt: blocks must be a list of text values")
@@ -41,9 +49,14 @@ class HexPrompt:
             block for index, block in enumerate([text, *extra_blocks])
             if (index >= len(enabled) or enabled[index]) and block.strip()
         )
+        if last_seed_fix:
+            wildcard_seed = seed or self.last_wildcard_seed or secrets.randbelow(1125899906842624)
+        else:
+            wildcard_seed = secrets.randbelow(1125899906842624)
+        self.last_wildcard_seed = wildcard_seed
         try:
             from impact import wildcards
-            processed_text = wildcards.process(source, seed)
+            processed_text = wildcards.process(source, wildcard_seed)
             clip_text = wildcards.remove_lora_tags(processed_text)
             parts = [part.strip() for part in clip_text.split("BREAK") if part.strip()] or [""]
         except Exception:
@@ -54,10 +67,8 @@ class HexPrompt:
         for part in parts[1:]:
             next_conditioning = CLIPTextEncode().encode(clip, part)[0]
             conditioning = ConditioningConcat().concat(conditioning, next_conditioning)[0]
-        return {
-            "ui": {"hexus_seed": [str(seed)]},
-            "result": (conditioning, processed_text),
-        }
+        return {"ui": {"hexus_seed": [str(wildcard_seed)]},
+                "result": (conditioning, processed_text)}
 
 
 class HexLatent:

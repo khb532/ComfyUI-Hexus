@@ -5,6 +5,11 @@ const wildcardLabel = "Select the Wildcard to add to the text";
 const BLOCK_HEIGHT = 150;
 const TEXT_HEIGHT = 105;
 const MIN_TEXT_HEIGHT = 60;
+function newSeed() {
+    const parts = new Uint32Array(2);
+    crypto.getRandomValues(parts);
+    return ((parts[0] & 0x3ffff) * 0x100000000 + parts[1]) || 1;
+}
 const autocompleteClass = import("../comfyui-custom-scripts/js/common/autocomplete.js")
     .then((module) => module.TextAreaAutoComplete)
     .catch(() => null);
@@ -23,13 +28,20 @@ function setupPromptBlocks(node) {
     const blocksWidget = node.widgets?.find((widget) => widget.name === "blocks");
     const enabledWidget = node.widgets?.find((widget) => widget.name === "block_enabled");
     const seedWidget = node.widgets?.find((widget) => widget.name === "seed");
-    const controlWidget = node.widgets?.find((widget) => widget.name === "control_after_generate");
+    const fixWidget = node.widgets?.find((widget) => widget.name === "last_seed_fix");
     const wildcardWidget = node.widgets?.find((widget) => widget.name === "Select to add Wildcard");
-    if (!textWidget || !blocksWidget || !enabledWidget || !seedWidget || !wildcardWidget || !node.addDOMWidget) return;
+    if (!textWidget || !blocksWidget || !enabledWidget || !seedWidget || !fixWidget || !wildcardWidget || !node.addDOMWidget) return;
 
     hideWidget(textWidget);
     hideWidget(blocksWidget);
     hideWidget(enabledWidget);
+    hideWidget(seedWidget);
+    fixWidget.label = "Last Seed Fix";
+    const fixChanged = fixWidget.callback;
+    fixWidget.callback = (...args) => {
+        fixChanged?.apply(fixWidget, args);
+        if ((args[0] ?? fixWidget.value) && seedWidget.value === 0) seedWidget.value = newSeed();
+    };
     const panel = document.createElement("div");
     Object.assign(panel.style, { padding: "6px", boxSizing: "border-box", color: "#ddd", fontSize: "12px" });
     for (const eventName of ["pointerdown", "pointermove", "pointerup", "mousedown", "mouseup", "click", "dblclick", "wheel"]) {
@@ -230,7 +242,7 @@ function setupPromptBlocks(node) {
             + (rows.length === 1 ? MIN_TEXT_HEIGHT : heights.reduce((sum, height) => sum + height, 0)),
     });
     const panelWidget = node.widgets.find((widget) => widget.name === "prompt_blocks");
-    node.widgets = [textWidget, blocksWidget, enabledWidget, panelWidget, seedWidget, controlWidget, wildcardWidget].filter(Boolean);
+    node.widgets = [textWidget, blocksWidget, enabledWidget, panelWidget, seedWidget, fixWidget, wildcardWidget];
     autocompleteClass.then((AutoComplete) => {
         if (!AutoComplete?.enabled) panelWidget.name = "text";
     });
@@ -285,8 +297,12 @@ function setupPromptBlocks(node) {
             const seedIndex = values.findIndex((value, index) => index > 0 && typeof value === "number");
             if (seedIndex >= 0) {
                 seedWidget.value = values[seedIndex];
-                if (controlWidget) controlWidget.value = values[seedIndex + 1] ?? controlWidget.value;
+                const savedMode = values[seedIndex + 1];
+                if (typeof savedMode === "boolean") fixWidget.value = savedMode;
+                else if (savedMode === "fixed" || savedMode === "Fix") fixWidget.value = true;
+                else if (typeof savedMode === "string") fixWidget.value = false;
             }
+            if (fixWidget.value && seedWidget.value === 0) seedWidget.value = newSeed();
         }
         rows = readRows();
         enabledRows = readEnabled();
@@ -325,14 +341,9 @@ app.registerExtension({
         const onExecuted = nodeType.prototype.onExecuted;
         nodeType.prototype.onExecuted = function (message) {
             onExecuted?.apply(this, arguments);
-            const seed = message?.hexus_seed?.[0];
+            const seed = Number(message?.hexus_seed?.[0]);
             const seedWidget = this.widgets?.find((widget) => widget.name === "seed");
-            const control = this.widgets?.find((widget) => widget.name === "control_after_generate");
-            if (seed === undefined || !seedWidget || !control || control.value === "fixed") return;
-            if (String(seedWidget.value) !== String(seed)) return;
-            control.beforeQueued?.({ isPartialExecution: false });
-            control.afterQueued?.({ isPartialExecution: false });
-            this.setDirtyCanvas?.(true, true);
+            if (Number.isSafeInteger(seed) && seed >= 0 && seedWidget) seedWidget.value = seed;
         };
     },
 });
