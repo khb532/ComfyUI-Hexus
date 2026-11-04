@@ -38,8 +38,8 @@ ComfyUI-Hexus adapts features from core and commonly used custom nodes, with inp
 | 패키지 | 사용처 | 필요 여부 |
 | --- | --- | --- |
 | [ComfyUI](https://github.com/Comfy-Org/ComfyUI) | 노드 실행 및 기본 인코더·샘플러·업스케일러 | 필수 |
-| [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack) | Hex Prompt의 와일드카드 처리와 목록 | 선택 사항; 없거나 처리 오류가 나면 입력 텍스트를 그대로 CLIP 인코딩 |
-| [ComfyUI-Inspire-Pack](https://github.com/ltdrdata/ComfyUI-Inspire-Pack) | 함께 설치할 노드팩; 현재 Hexus 코드에서 직접 호출하지 않음 | 설치 권장 |
+| [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack) | Hex Prompt의 와일드카드 처리와 목록 | 와일드 카드 사용시 필수 |
+| [ComfyUI-Inspire-Pack](https://github.com/ltdrdata/ComfyUI-Inspire-Pack) | 함께 설치할 노드팩; 현재 Hexus 코드에서 직접 호출하지 않음 | 와일드 카드 사용시 필수 |
 
 Hex LoraStack의 LoRA 정보·프리뷰 다운로드 기능은 Civitai API를 사용합니다. 이 기능을 사용할 때만 Civitai에 접속합니다.
 
