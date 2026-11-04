@@ -9,6 +9,68 @@ function currentPreview(node) {
 }
 
 
+function samplerForImage(node) {
+    const graph = node.graph ?? app.graph;
+    const linkId = node.inputs?.find((input) => input.name === "images")?.link;
+    if (linkId == null) return null;
+    const link = graph?._links?.get?.(linkId) ?? graph?.links?.[linkId];
+    const sampler = link && graph?.getNodeById?.(link.origin_id);
+    return sampler?.type === "HexSampler" ? sampler : null;
+}
+
+
+function clearStepPreview(node) {
+    node.hexusStepPreviewSequence = (node.hexusStepPreviewSequence ?? 0) + 1;
+    if (node.hexusStepPreviewActive) {
+        node.imgs = node.hexusFinishedImgs;
+        node.imageIndex = node.hexusFinishedImageIndex;
+        node.hexusFinishedImgs = undefined;
+        node.hexusFinishedImageIndex = undefined;
+        node.hexusStepPreviewActive = false;
+        node.setDirtyCanvas?.(true, true);
+    }
+    if (node.hexusStepPreviewUrl) URL.revokeObjectURL(node.hexusStepPreviewUrl);
+    node.hexusStepPreviewUrl = null;
+}
+
+
+function showStepPreview(node, blob) {
+    if (node.properties?.hexusStepPreview === false || !blob) return;
+    const sequence = (node.hexusStepPreviewSequence ?? 0) + 1;
+    node.hexusStepPreviewSequence = sequence;
+    const url = URL.createObjectURL(blob);
+    const image = new Image();
+    image.onload = () => {
+        if (sequence !== node.hexusStepPreviewSequence || node.properties?.hexusStepPreview === false) {
+            URL.revokeObjectURL(url);
+            return;
+        }
+        if (!node.hexusStepPreviewActive) {
+            node.hexusFinishedImgs = node.imgs;
+            node.hexusFinishedImageIndex = node.imageIndex;
+        }
+        if (node.hexusStepPreviewUrl) URL.revokeObjectURL(node.hexusStepPreviewUrl);
+        node.hexusStepPreviewUrl = url;
+        node.hexusStepPreviewActive = true;
+        node.imgs = [image];
+        node.imageIndex = 0;
+        node.setDirtyCanvas?.(true, true);
+    };
+    image.onerror = () => URL.revokeObjectURL(url);
+    image.src = url;
+}
+
+
+function showSamplerPreview(blob, ids) {
+    const matchingIds = ids.map(String);
+    for (const node of app.graph?._nodes ?? []) {
+        if (node.type !== "HexImage" || node.properties?.hexusStepPreview === false) continue;
+        const sampler = samplerForImage(node);
+        if (sampler && matchingIds.includes(String(sampler.id))) showStepPreview(node, blob);
+    }
+}
+
+
 function sendToSampler(target, source, mode, origin) {
     if (mode === "Inpaint" && !origin.imgs?.[origin.imageIndex ?? 0]) {
         window.alert("미리보기 이미지가 표시된 뒤 다시 시도하세요.");
@@ -124,9 +186,53 @@ function addActionButtons(node, prefix) {
         if (source) chooseSampler(source, "Inpaint", node);
     });
 
+    const divider = document.createElement("div");
+    Object.assign(divider.style, {
+        width: "100%", maxWidth: "340px", height: "1px", margin: "4px auto 0",
+        background: "#7d6565",
+    });
+    panel.append(divider);
+    const row = document.createElement("div");
+    Object.assign(row.style, {
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        width: "100%", maxWidth: "340px", height: "24px", margin: "0 auto",
+        color: "#f1e8e8", font: "12px sans-serif",
+    });
+    const label = document.createElement("span");
+    label.textContent = "Step Preview (Hex Only)";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.setAttribute("role", "switch");
+    Object.assign(toggle.style, {
+        position: "relative", width: "38px", height: "20px", padding: "0",
+        border: "1px solid #766666", borderRadius: "12px", cursor: "pointer",
+    });
+    const knob = document.createElement("span");
+    Object.assign(knob.style, {
+        position: "absolute", top: "2px", left: "2px", width: "14px", height: "14px",
+        borderRadius: "50%", background: "#fff", transition: "transform 0.15s ease",
+    });
+    toggle.append(knob);
+    const syncToggle = () => {
+        const enabled = node.properties.hexusStepPreview !== false;
+        toggle.setAttribute("aria-checked", String(enabled));
+        toggle.style.background = enabled ? "#3f9b76" : "#4d4545";
+        knob.style.transform = enabled ? "translateX(18px)" : "";
+    };
+    toggle.addEventListener("click", () => {
+        node.properties.hexusStepPreview = node.properties.hexusStepPreview === false;
+        if (!node.properties.hexusStepPreview) clearStepPreview(node);
+        syncToggle();
+        node.setDirtyCanvas?.(true, true);
+    });
+    row.append(label, toggle);
+    panel.append(row);
+    node.hexusSyncPreviewToggle = syncToggle;
+    syncToggle();
+
     const widget = node.addDOMWidget("hex_image_actions", "HexImageActions", panel, {
         serialize: false, hideOnZoom: false,
-        getMinHeight: () => 112, getMaxHeight: () => 112, getHeight: () => 112,
+        getMinHeight: () => 156, getMaxHeight: () => 156, getHeight: () => 156,
     });
     const oldIndex = node.widgets.indexOf(widget);
     const prefixIndex = node.widgets.indexOf(prefix);
@@ -141,22 +247,60 @@ function addActionButtons(node, prefix) {
 
 
 app.registerExtension({
-    name: "Hexus.HexPreviewSave",
+    name: "Hexus.HexImage",
     beforeRegisterNodeDef(nodeType, nodeData) {
-        if (nodeData.name !== "HexPreviewSave") return;
+        if (nodeData.name !== "HexImage") return;
 
         const onNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             onNodeCreated?.apply(this, arguments);
             this.hexusPreviews = [];
+            this.properties ||= {};
+            this.properties.hexusStepPreview ??= true;
             const prefix = this.widgets?.find((widget) => widget.name === "filename_prefix");
             if (prefix && this.addDOMWidget) addActionButtons(this, prefix);
         };
 
+        const onConfigure = nodeType.prototype.onConfigure;
+        nodeType.prototype.onConfigure = function () {
+            onConfigure?.apply(this, arguments);
+            this.hexusSyncPreviewToggle?.();
+        };
+
         const onExecuted = nodeType.prototype.onExecuted;
         nodeType.prototype.onExecuted = function (message) {
+            clearStepPreview(this);
             onExecuted?.apply(this, arguments);
             this.hexusPreviews = message?.images ?? [];
         };
+
+        const onRemoved = nodeType.prototype.onRemoved;
+        nodeType.prototype.onRemoved = function () {
+            clearStepPreview(this);
+            onRemoved?.apply(this, arguments);
+        };
+    },
+    setup() {
+        let executingNodeId = null;
+        api.addEventListener("executing", (event) => {
+            executingNodeId = event.detail ?? null;
+        });
+        api.addEventListener("b_preview_with_metadata", (event) => {
+            const { blob, nodeId, displayNodeId, node_id, display_node_id } = event.detail ?? {};
+            showSamplerPreview(blob, [nodeId, displayNodeId, node_id, display_node_id].filter((id) => id != null));
+        });
+        api.addEventListener("b_preview", (event) => {
+            if (api.serverSupportsFeature?.("supports_preview_metadata") || executingNodeId == null) return;
+            showSamplerPreview(event.detail, [executingNodeId]);
+        });
+        const clearAll = () => {
+            executingNodeId = null;
+            for (const node of app.graph?._nodes ?? []) {
+                if (node.type === "HexImage") clearStepPreview(node);
+            }
+        };
+        for (const event of ["execution_error", "execution_interrupted", "execution_success"]) {
+            api.addEventListener(event, clearAll);
+        }
     },
 });

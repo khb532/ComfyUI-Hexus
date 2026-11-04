@@ -4,8 +4,10 @@ import os
 import secrets
 
 import folder_paths
+import latent_preview
 import torch
 import comfy.model_management
+from comfy.cli_args import args
 from nodes import CLIPTextEncode, ConditioningConcat, InpaintModelConditioning, KSampler, LatentUpscaleBy, LoadImage, LoraLoader, MAX_RESOLUTION, VAEDecode, VAEEncode
 
 
@@ -169,6 +171,7 @@ class HexSampler:
                 "batch_size": ("INT", {key: value for key, value in latent["batch_size"][1].items() if key != "tooltip"}),
                 "image": (["", *images], {"image_upload": True}),
             },
+            "optional": {"step_preview": ("BOOLEAN", {"default": False})},
         }
 
     RETURN_TYPES = ("IMAGE", "LATENT")
@@ -193,7 +196,7 @@ class HexSampler:
         return True
 
     def sample(self, model, positive, negative, vae, mode, sampler, scheduler, steps,
-               cfg, denoise, seed, width, height, batch_size, image=""):
+               cfg, denoise, seed, width, height, batch_size, image="", step_preview=False):
         if seed == -1:
             seed = secrets.randbelow(1125899906842624)
         if mode == "t2i":
@@ -212,8 +215,13 @@ class HexSampler:
             else:
                 raise ValueError(f"Hex Sampler: unknown mode {mode}")
 
-        sampled = KSampler().sample(model, seed, steps, cfg, sampler, scheduler,
-                                    positive, negative, source, denoise)[0]
+        previous_preview_method = args.preview_method
+        latent_preview.set_preview_method("auto" if step_preview else "none")
+        try:
+            sampled = KSampler().sample(model, seed, steps, cfg, sampler, scheduler,
+                                        positive, negative, source, denoise)[0]
+        finally:
+            args.preview_method = previous_preview_method
         return (VAEDecode().decode(vae, sampled)[0], sampled)
 
 

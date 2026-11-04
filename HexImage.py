@@ -9,7 +9,7 @@ from nodes import PreviewImage
 from server import PromptServer
 
 
-class HexPreviewSave:
+class HexImage:
     @classmethod
     def INPUT_TYPES(cls):
         return {

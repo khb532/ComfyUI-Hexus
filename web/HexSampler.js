@@ -137,6 +137,20 @@ function placeMaskButton(node) {
     }
 }
 
+function keepSourceImagePreview(node) {
+    let images = node.imgs;
+    Object.defineProperty(node, "imgs", {
+        configurable: true,
+        get() { return images; },
+        set(next) {
+            const livePreview = node.preview;
+            if (Array.isArray(next) && next.length && Array.isArray(livePreview) &&
+                next.every((image) => livePreview.includes(image?.src))) return;
+            images = next;
+        },
+    });
+}
+
 function showImage(node, imageIndex) {
     const image = node.imgs?.[imageIndex ?? node.imageIndex ?? node.overIndex ?? 0];
     if (!image?.src) return;
@@ -198,6 +212,7 @@ app.registerExtension({
         const onNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             onNodeCreated?.apply(this, arguments);
+            keepSourceImagePreview(this);
             installImagePreview();
             bypassImageGallery();
             const addCustomWidget = this.addCustomWidget;
@@ -226,6 +241,7 @@ app.registerExtension({
             setDragSensitivity(this);
             const controlIndex = this.widgets.findIndex((widget) => widget.name === "control_after_generate");
             if (controlIndex !== -1) this.widgets.splice(controlIndex, 1);
+            showWidget(this.widgets.find((widget) => widget.name === "step_preview"), false);
 
             const modeChanged = modeWidget.callback;
             modeWidget.callback = (...args) => {
@@ -300,8 +316,20 @@ app.registerExtension({
         const queuePrompt = api.queuePrompt;
         api.queuePrompt = async function (index, prompt, ...args) {
             const queued = [];
+            const stepPreviewSamplers = new Set();
+            for (const [imageId, entry] of Object.entries(prompt?.output ?? {})) {
+                if (entry.class_type !== "HexImage") continue;
+                const source = entry.inputs?.images;
+                if (!Array.isArray(source) || Number(source[1]) !== 0) continue;
+                const workflowNode = prompt.workflow?.nodes?.find((item) => String(item.id) === imageId);
+                const canvasNode = app.graph?.getNodeById(Number(imageId));
+                const enabled = canvasNode?.properties?.hexusStepPreview
+                    ?? workflowNode?.properties?.hexusStepPreview ?? true;
+                if (enabled) stepPreviewSamplers.add(String(source[0]));
+            }
             for (const [id, entry] of Object.entries(prompt?.output ?? {})) {
                 if (entry.class_type !== "HexSampler") continue;
+                entry.inputs.step_preview = stepPreviewSamplers.has(id);
                 const seed = Number(entry.inputs.seed);
                 const actualSeed = seed === RANDOM_SEED ? newSeed() : seed;
                 entry.inputs.seed = actualSeed;
