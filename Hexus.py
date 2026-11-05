@@ -230,6 +230,9 @@ class HexHighres:
     def INPUT_TYPES(cls):
         sampler = KSampler.INPUT_TYPES()["required"]
         upscale = LatentUpscaleBy.INPUT_TYPES()["required"]
+        scale_by = (upscale["scale_by"][0], {**upscale["scale_by"][1], "step": 0.5})
+        cfg = (sampler["cfg"][0], {**sampler["cfg"][1], "step": 0.5})
+        denoise = (sampler["denoise"][0], {**sampler["denoise"][1], "step": 0.05})
         return {
             "required": {
                 "model": sampler["model"],
@@ -237,13 +240,13 @@ class HexHighres:
                 "negative": sampler["negative"],
                 "vae": ("VAE",),
                 "upscale_method": upscale["upscale_method"],
-                "scale_by": upscale["scale_by"],
+                "scale_by": scale_by,
                 "seed": sampler["seed"],
                 "steps": sampler["steps"],
-                "cfg": sampler["cfg"],
+                "cfg": cfg,
                 "sampler_name": sampler["sampler_name"],
                 "scheduler": sampler["scheduler"],
-                "denoise": sampler["denoise"],
+                "denoise": denoise,
             },
             "optional": {
                 "image": ("IMAGE",),
