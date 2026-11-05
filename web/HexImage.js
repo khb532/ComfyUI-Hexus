@@ -71,12 +71,20 @@ function showSamplerPreview(blob, ids) {
 }
 
 
-function sendToSampler(target, source, mode, origin) {
+async function sendToSampler(target, source, mode, origin) {
     if (mode === "Inpaint" && !origin.imgs?.[origin.imageIndex ?? 0]) {
         window.alert("미리보기 이미지가 표시된 뒤 다시 시도하세요.");
         return;
     }
-    target.hexusSetSourceImage(source, mode);
+    try {
+        if (!await target.hexusSetSourceImage(source, mode)) {
+            window.alert("Sampler에서 입력 이미지를 불러오지 못했습니다.");
+            return;
+        }
+    } catch (error) {
+        window.alert(`Sampler 이미지 전송 실패: ${error.message}`);
+        return;
+    }
     if (mode === "Inpaint") {
         ComfyApp.copyToClipspace(origin);
         ComfyApp.clipspace_return_node = target;

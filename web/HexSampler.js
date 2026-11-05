@@ -44,21 +44,76 @@ function showWidget(widget, visible) {
 function syncMode(node) {
     const mode = node.widgets?.find((widget) => widget.name === "mode")?.value ?? "t2i";
     const needsImage = mode !== "t2i";
-    const imageWidget = node.widgets?.find((widget) => widget.name === "image");
     for (const name of ["image", "upload"]) {
         showWidget(node.widgets?.find((widget) => widget.name === name), needsImage);
     }
+    showWidget(node.widgets?.find((widget) => widget.name === IMAGE_PREVIEW_WIDGET), needsImage);
     for (const name of ["width", "height", "batch_size", "Ratio Preset"]) {
         showWidget(node.widgets?.find((widget) => widget.name === name), !needsImage);
     }
     showWidget(node.widgets?.find((widget) => widget.name === "Edit Mask"), mode === "Inpaint");
-    if (!needsImage) node.imgs = undefined;
-    else if (node.hexusImageVisible === false && imageWidget?.value) {
-        imageWidget.callback?.(imageWidget.value);
-    }
-    node.hexusImageVisible = needsImage;
     node.setSize?.([node.size[0], node.computeSize()[1]]);
     node.setDirtyCanvas?.(true, true);
+}
+
+function sourceImageUrl(source) {
+    if (!source) return null;
+    let filename, subfolder, type;
+    if (typeof source === "string") {
+        const match = /^(.*?)(?: \[(input|output|temp)\])?$/.exec(source);
+        const path = match[1].replaceAll("\\", "/");
+        const slash = path.lastIndexOf("/");
+        filename = path.slice(slash + 1);
+        subfolder = slash >= 0 ? path.slice(0, slash) : "";
+        type = match[2] ?? "input";
+    } else {
+        ({ filename, subfolder = "", type = "input" } = source);
+    }
+    if (!filename) return null;
+    const params = new URLSearchParams({ filename, type });
+    if (subfolder) params.set("subfolder", subfolder);
+    return api.apiURL(`/view?${params}`);
+}
+
+function sourceForWidget(node, value) {
+    if (node.hexusSourceRefValue === value) return node.hexusSourceRef;
+    const image = node.images?.[0];
+    if (image?.filename && value?.startsWith(`${image.filename} [`)) return image;
+    return value;
+}
+
+function loadSourceImage(node, source) {
+    const value = node.widgets?.find((widget) => widget.name === "image")?.value;
+    node.hexusSourceValue = value;
+    const sequence = (node.hexusSourceSequence ?? 0) + 1;
+    node.hexusSourceSequence = sequence;
+    node.imgs = undefined;
+    const url = sourceImageUrl(source);
+    if (!url) return Promise.resolve(false);
+    return new Promise((resolve) => {
+        const image = new Image();
+        image.onload = () => {
+            if (sequence !== node.hexusSourceSequence) return resolve(false);
+            node.hexusSourceUrl = image.src;
+            node.imgs = [image];
+            node.imageIndex = 0;
+            node.setSize?.([node.size[0], node.computeSize()[1]]);
+            node.setDirtyCanvas?.(true, true);
+            resolve(true);
+        };
+        image.onerror = () => resolve(false);
+        image.src = url;
+    });
+}
+
+function sourceOnlyPreview(node, widget) {
+    if (widget.hexusSourceOnly) return;
+    const drawWidget = widget.drawWidget;
+    widget.drawWidget = function (context, options) {
+        return drawWidget.call(this, context, { ...options, previewImages: node.imgs ?? [] });
+    };
+    widget.hexusSourceOnly = true;
+    showWidget(widget, node.widgets?.find((item) => item.name === "mode")?.value !== "t2i");
 }
 
 function openRatioPreset(node) {
@@ -139,14 +194,15 @@ function placeMaskButton(node) {
 
 function keepSourceImagePreview(node) {
     let images = node.imgs;
+    node.hexusSourceUrl = images?.[0]?.src;
     Object.defineProperty(node, "imgs", {
         configurable: true,
         get() { return images; },
         set(next) {
-            const livePreview = node.preview;
-            if (Array.isArray(next) && next.length && Array.isArray(livePreview) &&
-                next.every((image) => livePreview.includes(image?.src))) return;
-            images = next;
+            if (!Array.isArray(next) || !next.length || next.every((image) =>
+                image?.src === node.hexusSourceUrl || image?.src?.startsWith("data:image/"))) {
+                images = next;
+            }
         },
     });
 }
@@ -218,9 +274,14 @@ app.registerExtension({
             const addCustomWidget = this.addCustomWidget;
             this.addCustomWidget = function (widget) {
                 const result = addCustomWidget.call(this, widget);
-                if (widget.name === IMAGE_PREVIEW_WIDGET) placeMaskButton(this);
+                if (widget.name === IMAGE_PREVIEW_WIDGET) {
+                    sourceOnlyPreview(this, widget);
+                    placeMaskButton(this);
+                }
                 return result;
             };
+            const existingPreview = this.widgets?.find((widget) => widget.name === IMAGE_PREVIEW_WIDGET);
+            if (existingPreview) sourceOnlyPreview(this, existingPreview);
             const modeWidget = this.widgets?.find((widget) => widget.name === "mode");
             const imageWidget = this.widgets?.find((widget) => widget.name === "image");
             const seedWidget = this.widgets?.find((widget) => widget.name === "seed");
@@ -247,6 +308,13 @@ app.registerExtension({
             modeWidget.callback = (...args) => {
                 modeChanged?.apply(modeWidget, args);
                 syncMode(this);
+                if (modeWidget.value !== "t2i" && imageWidget.value &&
+                    this.hexusSourceValue !== imageWidget.value) imageWidget.callback?.(imageWidget.value);
+            };
+            const imageChanged = imageWidget.callback;
+            imageWidget.callback = (...args) => {
+                imageChanged?.apply(imageWidget, args);
+                return loadSourceImage(this, sourceForWidget(this, imageWidget.value));
             };
 
             this.hexusLastSeed = null;
@@ -265,15 +333,16 @@ app.registerExtension({
                 () => openRatioPreset(this), { serialize: false });
             insertAfter(this, batchWidget, [presetButton]);
 
-            this.addWidget("button", "Edit Mask", null, () => {
+            this.addWidget("button", "Edit Mask", null, async () => {
                 if (!imageWidget.value) return;
+                if (!this.imgs?.length && !await loadSourceImage(this, sourceForWidget(this, imageWidget.value))) return;
                 ComfyApp.clipspace_return_node = this;
                 ComfyApp.open_maskeditor?.();
             }, { serialize: false });
             placeMaskButton(this);
 
             this.hexusSetSourceImage = (source, mode = "i2i") => {
-                if (!source || !["i2i", "Inpaint"].includes(mode)) return;
+                if (!source || !["i2i", "Inpaint"].includes(mode)) return Promise.resolve(false);
                 const filename = typeof source === "string" ? source
                     : `${[source.subfolder, source.filename].filter(Boolean).join("/")} [${source.type ?? "output"}]`;
                 const values = imageWidget.options.values;
@@ -281,9 +350,20 @@ app.registerExtension({
                 const previous = imageWidget.value;
                 modeWidget.value = mode;
                 imageWidget.value = filename;
+                this.hexusSourceRef = source;
+                this.hexusSourceRefValue = filename;
                 syncMode(this);
-                imageWidget.callback?.(filename);
+                const loaded = imageWidget.callback?.(filename);
                 this.onWidgetChanged?.("image", filename, previous, imageWidget);
+                return loaded;
+            };
+            const drawBackground = this.onDrawBackground;
+            this.onDrawBackground = function (...args) {
+                drawBackground?.apply(this, args);
+                if (modeWidget.value !== "t2i" && imageWidget.value &&
+                    this.hexusSourceValue !== imageWidget.value) {
+                    imageWidget.callback?.(imageWidget.value);
+                }
             };
             syncMode(this);
         };
@@ -307,6 +387,9 @@ app.registerExtension({
                 if (index >= 0) this.removeInput(index);
             }
             syncMode(this);
+            const imageWidget = this.widgets?.find((widget) => widget.name === "image");
+            const modeWidget = this.widgets?.find((widget) => widget.name === "mode");
+            if (modeWidget?.value !== "t2i" && imageWidget?.value) imageWidget.callback?.(imageWidget.value);
             return result;
         };
     },
