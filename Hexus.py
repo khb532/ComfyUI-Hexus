@@ -8,7 +8,7 @@ import latent_preview
 import torch
 import comfy.model_management
 from comfy.cli_args import args
-from nodes import CLIPTextEncode, ConditioningConcat, InpaintModelConditioning, KSampler, LatentUpscaleBy, LoadImage, LoraLoader, MAX_RESOLUTION, VAEDecode, VAEEncode
+from nodes import CLIPTextEncode, ConditioningConcat, KSampler, LatentUpscaleBy, LoadImage, LoraLoader, MAX_RESOLUTION, NODE_CLASS_MAPPINGS, VAEDecode, VAEEncode
 
 
 class HexPrompt:
@@ -171,7 +171,14 @@ class HexSampler:
                 "batch_size": ("INT", {key: value for key, value in latent["batch_size"][1].items() if key != "tooltip"}),
                 "image": (["", *images], {"image_upload": True}),
             },
-            "optional": {"step_preview": ("BOOLEAN", {"default": False})},
+            "optional": {
+                "step_preview": ("BOOLEAN", {"default": False}),
+                "guide_size": ("FLOAT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
+                "guide_size_for": ("BOOLEAN", {"default": True, "label_on": "mask bbox", "label_off": "crop region"}),
+                "max_size": ("FLOAT", {"default": 1216, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
+                "feather": ("INT", {"default": 15, "min": 0, "max": 100, "step": 1}),
+                "crop_factor": ("FLOAT", {"default": 3.0, "min": 1.0, "max": 10.0, "step": 0.1}),
+            },
         }
 
     RETURN_TYPES = ("IMAGE", "LATENT")
@@ -196,7 +203,8 @@ class HexSampler:
         return True
 
     def sample(self, model, positive, negative, vae, mode, sampler, scheduler, steps,
-               cfg, denoise, seed, width, height, batch_size, image="", step_preview=False):
+               cfg, denoise, seed, width, height, batch_size, image="", step_preview=False,
+               guide_size=512, guide_size_for=True, max_size=1216, feather=15, crop_factor=3.0):
         if seed == -1:
             seed = secrets.randbelow(1125899906842624)
         if mode == "t2i":
@@ -210,19 +218,30 @@ class HexSampler:
             elif mode == "Inpaint":
                 if not torch.any(image_mask > 0):
                     raise ValueError("Hex Sampler: paint a mask on the selected image for Inpaint")
-                positive, negative, source = InpaintModelConditioning().encode(
-                    positive, negative, pixels, vae, image_mask)
+                if denoise <= 0:
+                    raise ValueError("Hex Sampler: Inpaint denoise must be greater than 0")
+                if "MaskDetailerPipe" not in NODE_CLASS_MAPPINGS:
+                    raise RuntimeError("Hex Sampler: Inpaint requires ComfyUI-Impact-Pack")
             else:
                 raise ValueError(f"Hex Sampler: unknown mode {mode}")
 
         previous_preview_method = args.preview_method
         latent_preview.set_preview_method("auto" if step_preview else "none")
         try:
-            sampled = KSampler().sample(model, seed, steps, cfg, sampler, scheduler,
-                                        positive, negative, source, denoise)[0]
+            if mode == "Inpaint":
+                images = NODE_CLASS_MAPPINGS["MaskDetailerPipe"]().doit(
+                    pixels, image_mask, (model, None, vae, positive, negative),
+                    guide_size, guide_size_for, max_size, True, seed, steps, cfg,
+                    sampler, scheduler, denoise, feather, crop_factor, 5, 0.2,
+                    batch_size, 1, None, None, False, 20)[0]
+                sampled = VAEEncode().encode(vae, images)[0]
+            else:
+                sampled = KSampler().sample(model, seed, steps, cfg, sampler, scheduler,
+                                            positive, negative, source, denoise)[0]
+                images = VAEDecode().decode(vae, sampled)[0]
         finally:
             args.preview_method = previous_preview_method
-        return (VAEDecode().decode(vae, sampled)[0], sampled)
+        return (images, sampled)
 
 
 class HexHighres:
