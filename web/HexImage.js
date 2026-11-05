@@ -185,11 +185,11 @@ function addActionButtons(node, prefix) {
             node.hexusSaving = false;
         }
     });
-    makeButton("🖼️ i2i", "#244969", "#6197bf", "#eef8ff", () => {
+    makeButton("🖼️ i2i (Hex Only)", "#244969", "#6197bf", "#eef8ff", () => {
         const source = currentPreview(node);
         if (source) chooseSampler(source, "i2i", node);
     });
-    makeButton("🖌️ Inpaint", "#594369", "#a77dc0", "#fff1ff", () => {
+    makeButton("🖌️ inpaint (Hex Only)", "#594369", "#a77dc0", "#fff1ff", () => {
         const source = currentPreview(node);
         if (source) chooseSampler(source, "Inpaint", node);
     });
