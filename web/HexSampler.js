@@ -48,10 +48,14 @@ function syncMode(node) {
         showWidget(node.widgets?.find((widget) => widget.name === name), needsImage);
     }
     showWidget(node.widgets?.find((widget) => widget.name === IMAGE_PREVIEW_WIDGET), needsImage);
-    for (const name of ["width", "height", "batch_size", "Ratio Preset"]) {
+    for (const name of ["width", "height", "Ratio Preset"]) {
         showWidget(node.widgets?.find((widget) => widget.name === name), !needsImage);
     }
+    showWidget(node.widgets?.find((widget) => widget.name === "batch_size"), mode !== "i2i");
     showWidget(node.widgets?.find((widget) => widget.name === "Edit Mask"), mode === "Inpaint");
+    for (const name of ["guide_size", "guide_size_for", "max_size", "feather", "crop_factor"]) {
+        showWidget(node.widgets?.find((widget) => widget.name === name), mode === "Inpaint");
+    }
     node.setSize?.([node.size[0], node.computeSize()[1]]);
     node.setDirtyCanvas?.(true, true);
 }

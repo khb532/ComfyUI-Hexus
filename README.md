@@ -44,13 +44,14 @@ ComfyUI-Hexus adapts features from core and commonly used custom nodes, with inp
 
 <table><tr><td><img src="assets/images/Sampler.png" alt="Hex Sampler 노드 화면"></td><td><ul>
 <li>t2i·i2i·Inpaint 모드 / 샘플링 파라미터 통합</li>
+<li>샘플링 파라미터 통합</li>
 </ul></td></tr></table>
 
 ### Hex Image
 
 <table><tr><td><img src="assets/images/Image.png" alt="Hex Image 노드 화면"></td><td><ul>
 <li>IMAGE 미리보기·저장</li>
-<li>Step Preview (Hex Only) 토글로 생성 단계 미리보기 연산·표시 ON/OFF</li>
+<li>Step Preview (Hex Only)</li>
 <li>i2i·Inpaint - Hex Sampler 연계</li>
 </ul></td></tr></table>
 
@@ -59,7 +60,7 @@ ComfyUI-Hexus adapts features from core and commonly used custom nodes, with inp
 | 패키지 | 사용처 | 필요 여부 |
 | --- | --- | --- |
 | [ComfyUI](https://github.com/Comfy-Org/ComfyUI) | 노드 실행 및 기본 인코더·샘플러·업스케일러 | 필수 |
-| [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack) | Hex Prompt의 와일드카드 처리와 목록 | 와일드 카드 사용시 필수 |
+| [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack) | Hex Prompt 와일드카드, Hex Sampler MaskDetailer Inpaint | Inpaint 또는 와일드카드 사용 시 필수 |
 | [ComfyUI-Inspire-Pack](https://github.com/ltdrdata/ComfyUI-Inspire-Pack) | 함께 설치할 수 있는 노드팩; 현재 Hexus 코드에서 직접 호출하지 않음 | 선택 |
 
 Hex LoraStack의 LoRA 정보·프리뷰 다운로드 기능은 Civitai API를 사용합니다. 이 기능을 사용할 때만 Civitai에 접속합니다.
@@ -71,7 +72,7 @@ Hex LoraStack의 LoRA 정보·프리뷰 다운로드 기능은 Civitai API를 �
 | 프로젝트 | 라이선스 | 관계 |
 | --- | --- | --- |
 | [ComfyUI](https://github.com/Comfy-Org/ComfyUI/blob/master/LICENSE) | GPL-3.0 | 실행 환경·기본 노드 호출 |
-| [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/Main/LICENSE.txt) | GPL-3.0 | 와일드카드 기능 호출 |
+| [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/Main/LICENSE.txt) | GPL-3.0 | 와일드카드·MaskDetailer 기능 호출 |
 | [ComfyUI-Inspire-Pack](https://github.com/ltdrdata/ComfyUI-Inspire-Pack/blob/main/LICENSE) | GPL-3.0 | 설치 권장; 현재 직접 호출하지 않음 |
 
 각 라이선스의 원문과 적용 범위는 링크된 프로젝트에서 확인할 수 있습니다.
