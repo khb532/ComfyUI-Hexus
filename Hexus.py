@@ -4,8 +4,10 @@ import os
 import secrets
 
 import folder_paths
+import latent_preview
 import torch
 import comfy.model_management
+from comfy.cli_args import args
 from nodes import CLIPTextEncode, ConditioningConcat, InpaintModelConditioning, KSampler, LatentUpscaleBy, LoadImage, LoraLoader, MAX_RESOLUTION, VAEDecode, VAEEncode
 
 
@@ -169,6 +171,7 @@ class HexSampler:
                 "batch_size": ("INT", {key: value for key, value in latent["batch_size"][1].items() if key != "tooltip"}),
                 "image": (["", *images], {"image_upload": True}),
             },
+            "optional": {"step_preview": ("BOOLEAN", {"default": False})},
         }
 
     RETURN_TYPES = ("IMAGE", "LATENT")
@@ -193,7 +196,7 @@ class HexSampler:
         return True
 
     def sample(self, model, positive, negative, vae, mode, sampler, scheduler, steps,
-               cfg, denoise, seed, width, height, batch_size, image=""):
+               cfg, denoise, seed, width, height, batch_size, image="", step_preview=False):
         if seed == -1:
             seed = secrets.randbelow(1125899906842624)
         if mode == "t2i":
@@ -212,8 +215,13 @@ class HexSampler:
             else:
                 raise ValueError(f"Hex Sampler: unknown mode {mode}")
 
-        sampled = KSampler().sample(model, seed, steps, cfg, sampler, scheduler,
-                                    positive, negative, source, denoise)[0]
+        previous_preview_method = args.preview_method
+        latent_preview.set_preview_method("auto" if step_preview else "none")
+        try:
+            sampled = KSampler().sample(model, seed, steps, cfg, sampler, scheduler,
+                                        positive, negative, source, denoise)[0]
+        finally:
+            args.preview_method = previous_preview_method
         return (VAEDecode().decode(vae, sampled)[0], sampled)
 
 
@@ -222,6 +230,9 @@ class HexHighres:
     def INPUT_TYPES(cls):
         sampler = KSampler.INPUT_TYPES()["required"]
         upscale = LatentUpscaleBy.INPUT_TYPES()["required"]
+        seed_options = {key: value for key, value in sampler["seed"][1].items()
+                        if key not in ("tooltip", "control_after_generate")}
+        seed_options.update({"default": -1, "min": -1})
         return {
             "required": {
                 "model": sampler["model"],
@@ -230,7 +241,7 @@ class HexHighres:
                 "vae": ("VAE",),
                 "upscale_method": upscale["upscale_method"],
                 "scale_by": upscale["scale_by"],
-                "seed": sampler["seed"],
+                "seed": ("INT", seed_options),
                 "steps": sampler["steps"],
                 "cfg": sampler["cfg"],
                 "sampler_name": sampler["sampler_name"],
@@ -240,6 +251,7 @@ class HexHighres:
             "optional": {
                 "image": ("IMAGE",),
                 "latent": ("LATENT",),
+                "step_preview": ("BOOLEAN", {"default": False}),
             },
         }
 
@@ -248,14 +260,26 @@ class HexHighres:
     FUNCTION = "generate"
     CATEGORY = "Hexus"
 
+    @classmethod
+    def IS_CHANGED(cls, seed, **kwargs):
+        return secrets.randbelow(1125899906842624) if seed == -1 else seed
+
     def generate(self, model, positive, negative, vae, upscale_method, scale_by,
-                 seed, steps, cfg, sampler_name, scheduler, denoise, image=None, latent=None):
+                 seed, steps, cfg, sampler_name, scheduler, denoise, image=None, latent=None,
+                 step_preview=False):
+        if seed == -1:
+            seed = secrets.randbelow(1125899906842624)
         if (image is None) == (latent is None):
             raise ValueError("Hex Highres: connect exactly one of image or latent")
         source = VAEEncode().encode(vae, image)[0] if image is not None else latent
         enlarged = LatentUpscaleBy().upscale(source, upscale_method, scale_by)[0]
-        sampled = KSampler().sample(model, seed, steps, cfg, sampler_name, scheduler,
-                                    positive, negative, enlarged, denoise)[0]
+        previous_preview_method = args.preview_method
+        latent_preview.set_preview_method("auto" if step_preview else "none")
+        try:
+            sampled = KSampler().sample(model, seed, steps, cfg, sampler_name, scheduler,
+                                        positive, negative, enlarged, denoise)[0]
+        finally:
+            args.preview_method = previous_preview_method
         result = VAEDecode().decode(vae, sampled)[0]
         return (result, sampled)
 

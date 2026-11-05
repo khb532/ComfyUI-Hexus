@@ -1,23 +1,31 @@
 import asyncio
+import json
 import os
+import re
 import shutil
 
 import folder_paths
 from aiohttp import web
 from PIL import Image
-from nodes import PreviewImage
+import torch
+from comfy_execution.graph_utils import ExecutionBlocker
+from nodes import LoadImage, PreviewImage
 from server import PromptServer
 
 
-class HexPreviewSave:
+class HexImage:
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "images": ("IMAGE",),
                 "filename_prefix": ("STRING", {"default": "%date:yyyy-MM-dd%/%date:MM-dd%"}),
             },
-            "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
+            "optional": {
+                "images": ("IMAGE",),
+                "cache_mode": ("BOOLEAN", {"default": False}),
+                "cached_images": ("STRING", {"default": "[]"}),
+            },
+            "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO", "unique_id": "UNIQUE_ID"},
         }
 
     RETURN_TYPES = ("IMAGE",)
@@ -26,9 +34,42 @@ class HexPreviewSave:
     OUTPUT_NODE = True
     CATEGORY = "Hexus"
 
-    def preview(self, images, filename_prefix, prompt=None, extra_pnginfo=None):
-        # The temporary PNG is the preview and the source for an explicit Save click.
-        return PreviewImage().save_images(images, prompt=prompt, extra_pnginfo=extra_pnginfo)
+    def preview(self, filename_prefix, images=None, cache_mode=False, cached_images="[]",
+                prompt=None, extra_pnginfo=None, unique_id=None):
+        if cache_mode:
+            try:
+                items = json.loads(cached_images)
+                pixels = load_temp_images(items, unique_id)
+            except (FileNotFoundError, OSError, ValueError, TypeError):
+                return {"ui": {"images": []}, "result": (ExecutionBlocker(None),)}
+            return {"ui": {"images": items}, "result": (pixels,)}
+
+        if images is None:
+            return {"ui": {"images": []}, "result": (ExecutionBlocker(None),)}
+        preview = PreviewImage()
+        preview.prefix_append = ""
+        saved = preview.save_images(images, filename_prefix=f"hi#{safe_node_id(unique_id)}-temp",
+                                    prompt=prompt, extra_pnginfo=extra_pnginfo)
+        items = saved["ui"]["images"]
+        return {"ui": saved["ui"], "result": (load_temp_images(items, unique_id),)}
+
+
+def safe_node_id(unique_id):
+    return re.sub(r"[^A-Za-z0-9_-]", "_", str(unique_id))
+
+
+def load_temp_images(items, unique_id):
+    if not isinstance(items, list) or not items:
+        raise ValueError("No cached images")
+    prefix = f"hi#{safe_node_id(unique_id)}-temp_"
+    pixels = []
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("filename"), str) or not item["filename"].startswith(prefix):
+            raise ValueError("Cached image belongs to another Hex Image node")
+        path = preview_path(item)
+        relative = os.path.relpath(path, folder_paths.get_temp_directory())
+        pixels.append(LoadImage().load_image(f"{relative} [temp]")[0])
+    return torch.cat(pixels, dim=0)
 
 
 def preview_path(item):
