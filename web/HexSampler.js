@@ -288,6 +288,32 @@ app.registerExtension({
             const batchWidget = this.widgets?.find((widget) => widget.name === "batch_size");
             if (!modeWidget || !imageWidget || !seedWidget || !batchWidget) return;
 
+            const modeLabels = { t2i: "🎨 t2i", i2i: "🖼️ i2i", Inpaint: "🖌️ Inpaint" };
+            modeWidget.options.getOptionLabel = (value) => modeLabels[value] ?? value;
+            const modeClick = modeWidget.onClick;
+            modeWidget.onClick = function (context) {
+                const openMenus = new Set(document.querySelectorAll(".litecontextmenu"));
+                const result = modeClick.call(this, context);
+                const menu = [...document.querySelectorAll(".litecontextmenu")]
+                    .find((item) => !openMenus.has(item));
+                if (menu) {
+                    menu.style.minWidth = "240px";
+                    for (const entry of menu.querySelectorAll(".litemenu-entry")) {
+                        entry.style.minHeight = "36px";
+                        entry.style.padding = "8px 14px";
+                        entry.style.boxSizing = "border-box";
+                    }
+                    const bounds = menu.getBoundingClientRect();
+                    if (bounds.right > window.innerWidth - 10) {
+                        menu.style.left = `${Math.max(0, window.innerWidth - bounds.width - 10)}px`;
+                    }
+                    if (bounds.bottom > window.innerHeight - 10) {
+                        menu.style.top = `${Math.max(0, window.innerHeight - bounds.height - 10)}px`;
+                    }
+                }
+                return result;
+            };
+
             const denoiseWidget = this.widgets.find((widget) => widget.name === "denoise");
             if (denoiseWidget?.options) {
                 delete denoiseWidget.options.precision;
