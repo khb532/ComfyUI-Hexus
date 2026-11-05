@@ -9,13 +9,13 @@ function currentPreview(node) {
 }
 
 
-function samplerForImage(node) {
+function previewSourceForImage(node) {
     const graph = node.graph ?? app.graph;
     const linkId = node.inputs?.find((input) => input.name === "images")?.link;
     if (linkId == null) return null;
     const link = graph?._links?.get?.(linkId) ?? graph?.links?.[linkId];
-    const sampler = link && graph?.getNodeById?.(link.origin_id);
-    return sampler?.type === "HexSampler" ? sampler : null;
+    const source = link && graph?.getNodeById?.(link.origin_id);
+    return source?.type === "HexSampler" || source?.type === "HexHighres" ? source : null;
 }
 
 
@@ -61,12 +61,12 @@ function showStepPreview(node, blob) {
 }
 
 
-function showSamplerPreview(blob, ids) {
+function showSamplingPreview(blob, ids) {
     const matchingIds = ids.map(String);
     for (const node of app.graph?._nodes ?? []) {
         if (node.type !== "HexImage" || node.properties?.hexusStepPreview === false) continue;
-        const sampler = samplerForImage(node);
-        if (sampler && matchingIds.includes(String(sampler.id))) showStepPreview(node, blob);
+        const source = previewSourceForImage(node);
+        if (source && matchingIds.includes(String(source.id))) showStepPreview(node, blob);
     }
 }
 
@@ -265,6 +265,15 @@ app.registerExtension({
             this.hexusPreviews = [];
             this.properties ||= {};
             this.properties.hexusStepPreview ??= true;
+            for (const name of ["cache_mode", "cached_images"]) {
+                const widget = this.widgets?.find((item) => item.name === name);
+                if (!widget) continue;
+                widget.hidden = true;
+                widget.options ||= {};
+                widget.options.hidden = true;
+                widget.type = "hexus-hidden";
+                widget.computeSize = () => [0, -4];
+            }
             const prefix = this.widgets?.find((widget) => widget.name === "filename_prefix");
             if (prefix && this.addDOMWidget) addActionButtons(this, prefix);
         };
@@ -272,6 +281,7 @@ app.registerExtension({
         const onConfigure = nodeType.prototype.onConfigure;
         nodeType.prototype.onConfigure = function () {
             onConfigure?.apply(this, arguments);
+            this.hexusPreviews = this.properties?.hexusCachedImages ?? [];
             this.hexusSyncPreviewToggle?.();
         };
 
@@ -280,6 +290,7 @@ app.registerExtension({
             clearStepPreview(this);
             onExecuted?.apply(this, arguments);
             this.hexusPreviews = message?.images ?? [];
+            this.properties.hexusCachedImages = this.hexusPreviews;
         };
 
         const onRemoved = nodeType.prototype.onRemoved;
@@ -289,17 +300,35 @@ app.registerExtension({
         };
     },
     setup() {
+        const queuePrompt = api.queuePrompt;
+        api.queuePrompt = function (index, prompt, options, ...args) {
+            const targets = options?.partialExecutionTargets;
+            const partial = Array.isArray(targets) && targets.length > 0;
+            const selectedNodes = app.canvas?.selected_nodes ?? {};
+            for (const [id, entry] of Object.entries(prompt?.output ?? {})) {
+                if (entry.class_type !== "HexImage") continue;
+                const node = app.graph?.getNodeById(Number(id));
+                const workflowNode = prompt.workflow?.nodes?.find((item) => String(item.id) === id);
+                const cached = node?.hexusPreviews?.length ? node.hexusPreviews
+                    : workflowNode?.properties?.hexusCachedImages ?? [];
+                const sourceId = entry.inputs.images?.[0];
+                entry.inputs.cache_mode = partial && !selectedNodes[sourceId];
+                if (entry.inputs.cache_mode) delete entry.inputs.images;
+                entry.inputs.cached_images = JSON.stringify(cached);
+            }
+            return queuePrompt.call(this, index, prompt, options, ...args);
+        };
         let executingNodeId = null;
         api.addEventListener("executing", (event) => {
             executingNodeId = event.detail ?? null;
         });
         api.addEventListener("b_preview_with_metadata", (event) => {
             const { blob, nodeId, displayNodeId, node_id, display_node_id } = event.detail ?? {};
-            showSamplerPreview(blob, [nodeId, displayNodeId, node_id, display_node_id].filter((id) => id != null));
+            showSamplingPreview(blob, [nodeId, displayNodeId, node_id, display_node_id].filter((id) => id != null));
         });
         api.addEventListener("b_preview", (event) => {
             if (api.serverSupportsFeature?.("supports_preview_metadata") || executingNodeId == null) return;
-            showSamplerPreview(event.detail, [executingNodeId]);
+            showSamplingPreview(event.detail, [executingNodeId]);
         });
         const clearAll = () => {
             executingNodeId = null;

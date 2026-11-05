@@ -49,7 +49,8 @@ function setDragSensitivity(node) {
             if (!increments) return;
             dragPixels -= increments * 5;
             const step = dragSteps[name] ?? this.options.step2 ?? (this.options.step ? this.options.step / 10 : 1);
-            this.setValue(this.value + increments * step, { e, node, canvas });
+            const value = this.value + increments * step;
+            this.setValue(name === "denoise" ? Number(value.toFixed(10)) : value, { e, node, canvas });
         };
     }
 }
@@ -74,12 +75,22 @@ app.registerExtension({
         const originalCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             originalCreated?.apply(this, arguments);
+            this.imgs = undefined;
+            this.onDrawBackground = () => {};
             for (const widget of this.widgets ?? []) {
                 if (widget.options) delete widget.options.tooltip;
                 delete widget.tooltip;
             }
             for (const input of this.inputs ?? []) delete input.tooltip;
             setDragSensitivity(this);
+            const stepPreviewWidget = this.widgets?.find((widget) => widget.name === "step_preview");
+            if (stepPreviewWidget) {
+                stepPreviewWidget.hidden = true;
+                stepPreviewWidget.options ||= {};
+                stepPreviewWidget.options.hidden = true;
+                stepPreviewWidget.type = "hexus-hidden";
+                stepPreviewWidget.computeSize = () => [0, -4];
+            }
             const seedWidget = this.widgets?.find((widget) => widget.name === "seed");
             const controlIndex = this.widgets?.findIndex((widget) => widget.name === "control_after_generate") ?? -1;
             if (controlIndex !== -1) this.widgets.splice(controlIndex, 1);
@@ -134,8 +145,20 @@ app.registerExtension({
         const queuePrompt = api.queuePrompt;
         api.queuePrompt = async function (index, prompt, ...args) {
             const queued = [];
+            const stepPreviewHighres = new Set();
+            for (const [imageId, entry] of Object.entries(prompt?.output ?? {})) {
+                if (entry.class_type !== "HexImage") continue;
+                const source = entry.inputs?.images;
+                if (!Array.isArray(source) || Number(source[1]) !== 0) continue;
+                const workflowNode = prompt.workflow?.nodes?.find((item) => String(item.id) === imageId);
+                const canvasNode = app.graph?.getNodeById(Number(imageId));
+                const enabled = canvasNode?.properties?.hexusStepPreview
+                    ?? workflowNode?.properties?.hexusStepPreview ?? true;
+                if (enabled) stepPreviewHighres.add(String(source[0]));
+            }
             for (const [id, entry] of Object.entries(prompt?.output ?? {})) {
                 if (entry.class_type !== "HexHighres") continue;
+                entry.inputs.step_preview = stepPreviewHighres.has(id);
                 if (Array.isArray(entry.inputs.seed)) continue;
                 const seed = Number(entry.inputs.seed);
                 if (!Number.isFinite(seed)) continue;

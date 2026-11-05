@@ -251,6 +251,7 @@ class HexHighres:
             "optional": {
                 "image": ("IMAGE",),
                 "latent": ("LATENT",),
+                "step_preview": ("BOOLEAN", {"default": False}),
             },
         }
 
@@ -264,15 +265,21 @@ class HexHighres:
         return secrets.randbelow(1125899906842624) if seed == -1 else seed
 
     def generate(self, model, positive, negative, vae, upscale_method, scale_by,
-                 seed, steps, cfg, sampler_name, scheduler, denoise, image=None, latent=None):
+                 seed, steps, cfg, sampler_name, scheduler, denoise, image=None, latent=None,
+                 step_preview=False):
         if seed == -1:
             seed = secrets.randbelow(1125899906842624)
         if (image is None) == (latent is None):
             raise ValueError("Hex Highres: connect exactly one of image or latent")
         source = VAEEncode().encode(vae, image)[0] if image is not None else latent
         enlarged = LatentUpscaleBy().upscale(source, upscale_method, scale_by)[0]
-        sampled = KSampler().sample(model, seed, steps, cfg, sampler_name, scheduler,
-                                    positive, negative, enlarged, denoise)[0]
+        previous_preview_method = args.preview_method
+        latent_preview.set_preview_method("auto" if step_preview else "none")
+        try:
+            sampled = KSampler().sample(model, seed, steps, cfg, sampler_name, scheduler,
+                                        positive, negative, enlarged, denoise)[0]
+        finally:
+            args.preview_method = previous_preview_method
         result = VAEDecode().decode(vae, sampled)[0]
         return (result, sampled)
 
