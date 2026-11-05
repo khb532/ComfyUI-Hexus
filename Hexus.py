@@ -230,9 +230,9 @@ class HexHighres:
     def INPUT_TYPES(cls):
         sampler = KSampler.INPUT_TYPES()["required"]
         upscale = LatentUpscaleBy.INPUT_TYPES()["required"]
-        scale_by = (upscale["scale_by"][0], {**upscale["scale_by"][1], "step": 0.5})
-        cfg = (sampler["cfg"][0], {**sampler["cfg"][1], "step": 0.5})
-        denoise = (sampler["denoise"][0], {**sampler["denoise"][1], "step": 0.05})
+        seed_options = {key: value for key, value in sampler["seed"][1].items()
+                        if key not in ("tooltip", "control_after_generate")}
+        seed_options.update({"default": -1, "min": -1})
         return {
             "required": {
                 "model": sampler["model"],
@@ -240,13 +240,13 @@ class HexHighres:
                 "negative": sampler["negative"],
                 "vae": ("VAE",),
                 "upscale_method": upscale["upscale_method"],
-                "scale_by": scale_by,
-                "seed": sampler["seed"],
+                "scale_by": upscale["scale_by"],
+                "seed": ("INT", seed_options),
                 "steps": sampler["steps"],
-                "cfg": cfg,
+                "cfg": sampler["cfg"],
                 "sampler_name": sampler["sampler_name"],
                 "scheduler": sampler["scheduler"],
-                "denoise": denoise,
+                "denoise": sampler["denoise"],
             },
             "optional": {
                 "image": ("IMAGE",),
@@ -259,8 +259,14 @@ class HexHighres:
     FUNCTION = "generate"
     CATEGORY = "Hexus"
 
+    @classmethod
+    def IS_CHANGED(cls, seed, **kwargs):
+        return secrets.randbelow(1125899906842624) if seed == -1 else seed
+
     def generate(self, model, positive, negative, vae, upscale_method, scale_by,
                  seed, steps, cfg, sampler_name, scheduler, denoise, image=None, latent=None):
+        if seed == -1:
+            seed = secrets.randbelow(1125899906842624)
         if (image is None) == (latent is None):
             raise ValueError("Hex Highres: connect exactly one of image or latent")
         source = VAEEncode().encode(vae, image)[0] if image is not None else latent
